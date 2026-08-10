@@ -33,9 +33,9 @@ output/
 tmp/
 
 # Local design/agent artifacts
-frontend/design-system/
-frontend/AGENTS.md
-frontend/CLAUDE.md
+Practica1/frontend/design-system/
+Practica1/frontend/AGENTS.md
+Practica1/frontend/CLAUDE.md
 .codex/
 
 # Local copy of the assignment brief
