@@ -1,0 +1,75 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { LotIcon, PlusEggIcon, TemperatureIcon } from "@/components/icons/egg-icons";
+import { useSimulatedTelemetry } from "@/hooks/use-simulated-telemetry";
+import type { Lot } from "@/lib/types";
+
+const formSchema = z.object({
+  label: z.string().trim().min(3, "Escribe una etiqueta de al menos 3 caracteres").max(40, "Usa máximo 40 caracteres"),
+  entryDate: z.string().min(1, "Selecciona la fecha de ingreso"),
+  quantity: z.number({ error: "Ingresa una cantidad válida" }).int("Usa un número entero").min(1, "Registra al menos 1 huevo").max(60, "La capacidad máxima es de 60 huevos"),
+  requiredTemperature: z.number({ error: "Ingresa una temperatura válida" }).min(36, "La temperatura mínima es 36 °C").max(38, "La temperatura máxima es 38 °C"),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+const today = new Date().toISOString().slice(0, 10);
+
+function FieldError({ message }: { message?: string }) {
+  return message ? <span className="field-error" role="alert">{message}</span> : null;
+}
+
+function FichaCard({ lot }: { lot: Lot }) {
+  return (
+    <motion.aside className="ficha-card" initial={{ opacity: 0, scale: 1.08, rotate: -1.2 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ type: "spring", stiffness: 220, damping: 20 }} aria-live="polite">
+      <div className="ficha-top"><span className="ficha-seal"><LotIcon size={54} /></span><div><span>FICHA DE INCUBACIÓN</span><strong>SmartEgg · Equipo 15</strong></div></div>
+      <div className="ficha-identity"><p>Etiqueta del lote</p><h3>{lot.label}</h3><span className="mono">{lot.id}</span></div>
+      <dl className="ficha-data">
+        <div><dt>Fecha de ingreso</dt><dd>{new Intl.DateTimeFormat("es-GT", { dateStyle: "long", timeZone: "UTC" }).format(new Date(`${lot.entryDate}T00:00:00Z`))}</dd></div>
+        <div><dt>Cantidad registrada</dt><dd>{lot.quantity} huevos</dd></div>
+        <div><dt>Temperatura requerida</dt><dd><TemperatureIcon size={23} />{lot.requiredTemperature.toFixed(1)} °C</dd></div>
+      </dl>
+      <div className="ficha-footer"><span /><p>Registro guardado localmente</p></div>
+    </motion.aside>
+  );
+}
+
+export function FichaHuevoForm() {
+  const { addLot } = useSimulatedTelemetry();
+  const [created, setCreated] = useState<Lot | null>(null);
+  const reduceMotion = useReducedMotion();
+  const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    mode: "onChange",
+    defaultValues: { label: "", entryDate: today, quantity: 12, requiredTemperature: 37.5 },
+  });
+
+  const submit = (values: FormValues) => {
+    const lot = addLot(values);
+    setCreated(lot);
+  };
+
+  return (
+    <div className="new-lot-layout">
+      <section className="form-panel">
+        <div className="form-heading"><span className="form-step">01</span><div><p className="eyebrow">Nueva ficha</p><h2>Datos de ingreso</h2><p>Completa la información que acompañará al lote durante todo el ciclo.</p></div></div>
+        <form onSubmit={handleSubmit(submit)} noValidate>
+          <div className="field full"><label htmlFor="label">Etiqueta del lote</label><input id="label" placeholder="Ej. Criollo dorado" aria-invalid={Boolean(errors.label)} {...register("label")} /><small>Usa un nombre fácil de reconocer en el panel.</small><FieldError message={errors.label?.message} /></div>
+          <div className="form-grid">
+            <div className="field"><label htmlFor="entryDate">Fecha de ingreso</label><input id="entryDate" type="date" max={today} aria-invalid={Boolean(errors.entryDate)} {...register("entryDate")} /><FieldError message={errors.entryDate?.message} /></div>
+            <div className="field"><label htmlFor="quantity">Cantidad de huevos</label><div className="input-suffix"><input id="quantity" type="number" min="1" max="60" aria-invalid={Boolean(errors.quantity)} {...register("quantity", { valueAsNumber: true })} /><span>unidades</span></div><FieldError message={errors.quantity?.message} /></div>
+          </div>
+          <div className="field full"><label htmlFor="requiredTemperature">Temperatura requerida al ingreso</label><div className="temperature-input"><TemperatureIcon size={29} /><input id="requiredTemperature" type="number" min="36" max="38" step="0.1" aria-invalid={Boolean(errors.requiredTemperature)} {...register("requiredTemperature", { valueAsNumber: true })} /><span>°C</span></div><small>Rango recomendado para incubación: 36–38 °C.</small><FieldError message={errors.requiredTemperature?.message} /></div>
+          <div className="form-actions"><Link href="/lotes" className="button ghost">Cancelar</Link><button type="submit" className="button primary" disabled={isSubmitting || Boolean(created)}><PlusEggIcon />{created ? "Ficha creada" : "Crear ficha"}</button></div>
+        </form>
+      </section>
+      <div className="preview-panel"><div className="preview-label"><span>Vista previa</span><small>Se genera al guardar</small></div><AnimatePresence mode="wait">{created ? <FichaCard key={created.id} lot={created} /> : <motion.div className="empty-ficha" initial={false} animate={{ opacity: 1 }}><LotIcon size={70} /><h3>Tu ficha aparecerá aquí</h3><p>Al crear el registro tendrás una identificación clara y lista para consultar.</p></motion.div>}</AnimatePresence>{created && <motion.div className="success-message" initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} role="status"><span>✓</span><p><strong>Registro creado correctamente.</strong><br />Ya está disponible en el listado de lotes.</p><button type="button" onClick={() => { setCreated(null); reset(); }}>Registrar otro</button></motion.div>}</div>
+    </div>
+  );
+}

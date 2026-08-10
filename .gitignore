@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.*
+
+# Next.js and production output
+.next/
+out/
+dist/
+build/
+
+# TypeScript and test coverage
+*.tsbuildinfo
+coverage/
+
+# Environment files and local secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Browser and QA artifacts
+.playwright-cli/
+playwright-report/
+test-results/
+output/
+tmp/
+
+# Local design/agent artifacts
+frontend/design-system/
+frontend/AGENTS.md
+frontend/CLAUDE.md
+.codex/
+
+# Local copy of the assignment brief
+779_Practica_1_2S2026_version2.pdf
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
