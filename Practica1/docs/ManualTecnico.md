@@ -31,7 +31,7 @@ Durante la fase de manufactura se realizaron cortes a medida para el ensamblado 
 ![proceso3](imagenes/proceso3.jpeg)  
 ![proceso4](imagenes/proceso4.jpeg)  
 ![proceso5](imagenes/proceso5.jpeg)  
-* **Impresión 3D:** Fabricación del disco circular de 3 cavidades diseñado para acoplarse directamente al eje del servomotor y permitir el balanceo periódico de los huevos[cite: 1].
+* **Impresión 3D:** Fabricación del disco circular de 3 cavidades diseñado para acoplarse directamente al eje del servomotor y permitir el balanceo periódico de los huevos.
 * **Etapa de Potencia:** Instalación del sócate para la bombilla incandescente, ventilador de enfriamiento y cableado hacia el compartimento inferior.  
 
 ### Fotografías del prototipo final  
@@ -166,7 +166,11 @@ La plataforma cuenta con un backend desarrollado en **Python (Flask)** que expon
 **Respuesta esperada:**  
 ![reporte](imagenes/getReporte.png)
 
+## Manual de Usuario
+**Este enlace redirecciona al manual de usuario de la práctica 1:**  
+[Manual De Usuario](ManualUsuario.md)
 
-## Captura de github sobre los commits.  
+## Captura de github de los commits. 
+![commits](imagenes/commitsRepositorio.png)
 
 
