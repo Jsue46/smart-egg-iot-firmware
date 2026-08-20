@@ -8,15 +8,18 @@ from database import get_connection
 
 def encontrar_puerto():
     puertos = list(serial.tools.list_ports.comports())
+    if not puertos:
+        return None
+        
     for puerto in puertos:
-        # Busca descriptores  de Arduino
-        if any(keyword in puerto.description.upper() 
-               for keyword in ["ARDUINO", "CH340", "FTDI", "USB SERIAL"]):
+        # Busca descriptores comunes de Arduino
+        if any(keyword in puerto.description.upper() for keyword in ["ARDUINO", "CH340", "FTDI", "USB SERIAL", "CP210"]):
             print(f"Arduino detectado en {puerto.device}")
             return puerto.device
-    # Si no se encuentra el arduino, devuelve None y entra al modo simulado
-    
-    return None
+            
+    # Si hay puertos pero no coinciden con los nombres típicos, usa el último (común en Windows)
+    print(f"Puerto genérico detectado ({puertos[-1].device} - {puertos[-1].description}), probando conexión...")
+    return puertos[-1].device
 
 def guardar_lectura(data):
     conn = get_connection()
@@ -80,20 +83,19 @@ def leer_serial():
                         ultimo_dato = data
                         guardar_lectura(data)
         except Exception as e:
-            # Si no hay Arduino, genera datos simulados
-            print(f"Arduino no encontrado ({e}). Usando datos simulados.")
-            while True:
-                data = {
-                    "temperatura": round(random.uniform(36.5, 39.0), 1),
-                    "humedad": round(random.uniform(48.0, 67.0), 1),
-                    "espacios_libres": random.randint(0, 3),
-                    "foco": "ON",
-                    "fan": "OFF",
-                    "alarma": random.random() < 0.2
-                }
-                ultimo_dato = data
-                guardar_lectura(data)
-                time.sleep(2)
+            # Si no hay Arduino, genera datos simulados e intenta reconectar
+            print(f"Arduino no encontrado ({e}). Reintentando en 2s (simulando dato temporal)...")
+            data = {
+                "temperatura": round(random.uniform(36.5, 39.0), 1),
+                "humedad": round(random.uniform(48.0, 67.0), 1),
+                "espacios_libres": random.randint(0, 3),
+                "foco": "ON",
+                "fan": "OFF",
+                "alarma": random.random() < 0.2
+            }
+            ultimo_dato = data
+            guardar_lectura(data)
+            time.sleep(2)
                 
 def iniciar_hilo_serial():
     hilo = threading.Thread(target=leer_serial, daemon=True)

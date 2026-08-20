@@ -32,6 +32,7 @@ function AnimatedReading({ value, decimals }: { value: number; decimals: number 
 
 function Sparkline({ values, accent }: { values: number[]; accent: SensorCardProps["accent"] }) {
   const path = useMemo(() => {
+    if (!values || values.length === 0) return "";
     const min = Math.min(...values);
     const max = Math.max(...values);
     const span = max - min || 1;

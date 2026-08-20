@@ -1,5 +1,5 @@
-from flask import Flask, jsonify, request, send_file
-from flask_cors import CORS
+from flask import Flask, jsonify, request, send_file # type: ignore
+from flask_cors import CORS # type: ignore
 from database import init_db, get_connection
 from serial_reader import iniciar_hilo_serial, ultimo_dato
 from pdf_generator import generar_pdf
@@ -101,4 +101,4 @@ def descargar_reporte():
     )
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, use_reloader=False, port=5000)
