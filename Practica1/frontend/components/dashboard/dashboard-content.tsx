@@ -52,12 +52,12 @@ export function DashboardContent() {
         <motion.article className="system-bento-card" variants={{ hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0 } }}>
           <div className="system-bento-head">
             <span className="system-bento-icon"><ConnectionIcon size={35} /></span>
-            <span className="system-live-tag"><i /> En línea</span>
+            <span className={telemetry.isOnline ? "system-live-tag" : "system-live-tag offline"}><i /> {telemetry.isOnline ? "En línea" : "Desconectado"}</span>
           </div>
           <div className="system-bento-copy">
             <p>Estado general</p>
-            <h3>Sistema conectado</h3>
-            <span>Nodo SE-01 · lectura estable</span>
+            <h3>{telemetry.isOnline ? "Sistema conectado" : "Buscando nodo..."}</h3>
+            <span>{telemetry.isOnline ? "Nodo SE-01 · lectura estable" : "Sin conexión con Arduino"}</span>
           </div>
           <footer><span>Operado por</span><strong>{telemetry.technician.name}</strong></footer>
         </motion.article>
