@@ -17,18 +17,29 @@ El sistema SmartEgg implementa una arquitectura estructurada en las 4 capas del 
 
 ## Fotografías del prototipo (mockup, proceso de elaboración y prototipo final). 
 ### Mockups del Prototipo físico  
+Previo al ensamblado final, se concibió el diseño estructural de la incubadora para garantizar aislamiento térmico y visibilidad del proceso:  
+![muckupMaqueta](imagenes/mockupMaqueta.png)  
 
+- **Cámara Superior de Acrílico:** Cubo transparente para monitoreo visual directo con ventilador extractor lateral de 12V y bombilla incandescente como fuente de calor.
+- **Mecanismo de Volteo 3D:** Disco rotativo impreso en 3D con 3 cavidades para huevos, conectado directamente al eje del servomotor para generar una oscilación periódica de $\pm 45^\circ$.
+- **Compartimento Inferior de Encapsulado:** Base aislada para ocultar el microcontrolador (Arduino Mega), los módulos de relé y el cableado de potencia.
 
 ### Fotografías del proceso de elaboración  
+Durante la fase de manufactura se realizaron cortes a medida para el ensamblado del habitáculo térmico en láminas de acrílico transparente, asegurando el sellado perimetral y la perforación para el extractor de aire lateral. En paralelo, se implementó la base inferior de encapsulado para alojar el microcontrolador, la etapa de potencia con relés y la fuente de alimentación, aislando el cableado de la cámara de incubación.  
 ![proceso1](imagenes/proceso1.jpeg)  
 ![proceso2](imagenes/proceso2.jpeg)  
 ![proceso3](imagenes/proceso3.jpeg)  
 ![proceso4](imagenes/proceso4.jpeg)  
 ![proceso5](imagenes/proceso5.jpeg)  
+* **Impresión 3D:** Fabricación del disco circular de 3 cavidades diseñado para acoplarse directamente al eje del servomotor y permitir el balanceo periódico de los huevos[cite: 1].
+* **Etapa de Potencia:** Instalación del sócate para la bombilla incandescente, ventilador de enfriamiento y cableado hacia el compartimento inferior.  
 
 ### Fotografías del prototipo final  
+El prototipo final presenta un encapsulado profesional que separa la cámara de incubación del compartimento electrónico. Los cables no se encuentran expuestos a la vista, garantizando la estética y seguridad requeridas para un Producto Mínimo Viable.  
 ![prototipo1](imagenes/prototipo1.jpeg)  
 ![prototipo2](imagenes/prototipo2.jpeg)  
+* **Cámara de Incubación:** Espacio transparente con sensor DHT11 ubicado en pared interior, foco calefactor y plato rotativo 3D con un huevo cargado para validación.
+* **Encapsulado Inferior:** Casing que oculta el Arduino Mega, el módulo de relé y los empalmes eléctricos, permitiendo únicamente la salida del cable de comunicación serial USB hacia el computador.
 
 
 ## Mockups de la Aplicación Web/Móvil.  
@@ -37,15 +48,33 @@ A continuación se presentan los prototipos visuales de la plataforma IoT diseñ
 ![mockup-web](imagenes/mockup2.png)   
 ![mockup-web](imagenes/mockup3.png)  
 
-## Diagrama de Conexiones
-![conexiones](imagenes/DiagramaDeConexiones.png)  
+## Diagrama de Conexiones  
+Para validar el conexionado de señales de control, buses de comunicación y líneas de potencia antes del ensamblado físico, se estructuró la topología eléctrica completa mediante la plataforma de simulación **Wokwi**:  
+![conexiones](imagenes/DiagramaDeConexiones.png)   
+### Especificación de Pines y Distribución de Señales:
+* **Sensor Digital DHT11 (Pin 2):** Comunicación digital por protocolo 1-Wire para muestreo de variables ambientales (temperatura y humedad).
+* **Líneas de Interrupción por Hardware:**
+  * `Pin 3` (Interrupción Externa 0): Conectado al pulsador principal con resistencia Pull-Up para control de encendido/standby (`ISR_toggleSistema`).
+  * `Pin 18` (Interrupción Externa 5): Entrada de interrupción secundaria para eventos de diagnóstico y prueba (`ISR_eventoSecundario`).
+* **Control de Potencia y Actuadores:**
+  * `Pin 6` (MOSFET / Salida Digital): Control de conmutación para el ventilador extractor de 12V.
+  * `Pin 7` (Relé / Salida Digital): Control de conmutación para la bombilla térmica incandescente (lógica activa en bajo).
+  * `Pin 8` (Salida Digital): Disparo de alarma sonora mediante buzzer activo ante anomalías térmicas o de humedad.
+  * `Pin 9` (PWM): Línea de control del servomotor MG996R para el mecanismo oscilatorio de la bandeja ($\pm45^\circ$).
+* **Detección de Huevos / Finales de Carrera:** Pines digitales `49`, `51` y `53` con modo `INPUT_PULLUP` para monitoreo de los 3 espacios disponibles.
+* **Bus de Comunicación I2C:** Pines `20 (SDA)` y `21 (SCL)` para despliegue local de telemetría en la pantalla LCD 16x2 (`0x27`).
 
 ## Diagrama de Arquitectura de Software.
-El flujo de datos del ecosistema se distribuye de la siguiente manera:
-![diagrama arquitectura](imagenes/diagramaArquitectura.png)
+El flujo de datos del ecosistema se distribuye de la siguiente manera:  
+![diagrama arquitectura](imagenes/diagramaArquitectura.png)  
 
-## Diagrama de Automatización  
+## Diagrama de Automatización (Interrupciones / Tasks)
+![automatizacion](imagenes/diagramaAutomatizacion.png)  
 
+El Arduino UNO no tiene un sistema operativo, así que la "multitarea" se logra con dos mecanismos combinados:  
+
+1. **Interrupciones por hardware (asíncronas):** los pines 3 y 18 disparan una ISR de inmediato sin importar en qué parte del `loop()` esté el programa. Las ISR solo cambian una bandera `volatile` (con antirrebote de 250 ms) — nunca hacen trabajo pesado dentro de la interrupción, que es la buena práctica.
+2. **Tareas cooperativas con `millis()` (síncronas):** dentro de `loop()`, dos bloques comparan el tiempo transcurrido contra un intervalo (`previousServoTime`, `previousSensorTime`) para decidir si les toca ejecutarse. Esto emula el comportamiento de tareas independientes de FreeRTOS, pero sin bloquear el `loop()` con `delay()`.
 
 ## Documentación de la API 
 La plataforma cuenta con un backend desarrollado en **Python (Flask)** que expone una API RESTful para la sincronización y persistencia de las lecturas del microcontrolador, la gestión de lotes/huevos de incubación, el registro de alarmas y la exportación de reportes.
