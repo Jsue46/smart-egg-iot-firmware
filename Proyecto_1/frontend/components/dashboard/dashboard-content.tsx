@@ -1,20 +1,17 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { IncubatorSignature } from "@/components/escena3d/incubator-signature";
 import { AlarmIcon, CapacityIcon, ConnectionIcon, HumidityIcon, PauseIcon, PlayIcon, RotationIcon, TemperatureIcon } from "@/components/icons/egg-icons";
 import { SensorCard } from "@/components/sensores/sensor-card";
 import { useToast } from "@/components/ui/toast-provider";
 import { useSimulatedTelemetry } from "@/hooks/use-simulated-telemetry";
+import { AnalyticsCharts } from "@/components/graficas/AnalyticsCharts";
+import { IncubatorVisualizer } from "@/components/graficas/IncubatorVisualizer";
 
 export function DashboardContent() {
   const telemetry = useSimulatedTelemetry();
   const { showToast } = useToast();
   const reduceMotion = useReducedMotion();
-  const temperatureTrend = telemetry.history.map((point) => point.temperature);
-  const humidityTrend = telemetry.history.map((point) => point.humidity);
-  const angleTrend = telemetry.history.map((_, index) => Math.sin(index / 3) * 45);
-  const capacityTrend = telemetry.history.map((_, index) => telemetry.occupied + Math.sin(index / 6) * 0.4);
   const freeSlots = Math.max(0, telemetry.capacity - telemetry.occupied);
   const toggleTelemetry = () => {
     telemetry.togglePaused();
@@ -48,7 +45,7 @@ export function DashboardContent() {
         initial="hidden"
         animate="show"
       >
-        <IncubatorSignature angle={telemetry.servoAngle} temperature={telemetry.temperature} occupied={telemetry.occupied} capacity={telemetry.capacity} isAlarm={telemetry.isAlarm} />
+        <IncubatorVisualizer />
         <motion.article className="system-bento-card" variants={{ hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0 } }}>
           <div className="system-bento-head">
             <span className="system-bento-icon"><ConnectionIcon size={35} /></span>
@@ -61,11 +58,12 @@ export function DashboardContent() {
           </div>
           <footer><span>Operado por</span><strong>{telemetry.technician.name}</strong></footer>
         </motion.article>
-        <SensorCard className="bento-temperature" label="Temperatura" value={telemetry.temperature} suffix="°C" decimals={1} detail="Objetivo 37.5 °C" icon={<TemperatureIcon />} trend={temperatureTrend} accent={telemetry.isAlarm ? "alert" : "yolk"} state={telemetry.isAlarm ? "Atención" : "Óptimo"} />
-        <SensorCard className="bento-humidity" label="Humedad" value={telemetry.humidity} suffix="%" decimals={1} detail="Rango 50–65 %" icon={<HumidityIcon />} trend={humidityTrend} accent="aqua" state="Estable" />
-        <SensorCard className="bento-rotation" label="Rotación" value={telemetry.servoAngle} suffix="°" detail="Ciclo ±45°" icon={<RotationIcon />} trend={angleTrend} accent="violet" state="En ciclo" />
-        <SensorCard className="bento-capacity" label="Espacios ocupados" value={telemetry.occupied} suffix={` / ${telemetry.capacity}`} detail={`${freeSlots} ${freeSlots === 1 ? "espacio libre" : "espacios libres"}`} icon={<CapacityIcon />} trend={capacityTrend} accent="sprout" state="Disco" />
+        <SensorCard className="bento-temperature" label="Temperatura" value={telemetry.temperature} suffix="°C" decimals={1} detail="Objetivo 37.5 °C" icon={<TemperatureIcon />} accent={telemetry.isAlarm ? "alert" : "yolk"} state={telemetry.isAlarm ? "Atención" : "Óptimo"} />
+        <SensorCard className="bento-humidity" label="Humedad" value={telemetry.humidity} suffix="%" decimals={1} detail="Rango 50–65 %" icon={<HumidityIcon />} accent="aqua" state="Estable" />
+        <SensorCard className="bento-rotation" label="Rotación" value={telemetry.servoAngle} suffix="°" detail="Ciclo ±45°" icon={<RotationIcon />} accent="violet" state="En ciclo" />
+        <SensorCard className="bento-capacity" label="Espacios ocupados" value={telemetry.occupied} suffix={` / ${telemetry.capacity}`} detail={`${freeSlots} ${freeSlots === 1 ? "espacio libre" : "espacios libres"}`} icon={<CapacityIcon />} accent="sprout" state="Disco" />
       </motion.section>
+      <AnalyticsCharts />
     </div>
   );
 }

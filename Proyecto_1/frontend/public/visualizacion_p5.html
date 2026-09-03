@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>SmartEgg — Visualización Interactiva p5.js</title>
+<style>
+  :root {
+    --bg-page: #ffffff;
+    --card-bg: rgba(255, 255, 255, 0.95);
+    --border-soft: #d8ded3;
+    --green-dark: #1e3d34;
+    --green-soft: #eaf5f0;
+    --alarm: #dc2626;
+    --text-main: #192e26;
+    --text-muted: #5f756b;
+  }
+
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    background: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+  }
+
+  #wrap {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #ffffff;
+  }
+
+  canvas {
+    display: block;
+  }
+
+  #hud {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 11px;
+    line-height: 1.3;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    backdrop-filter: blur(6px);
+    z-index: 5;
+  }
+  #hud .row { display: flex; justify-content: space-between; gap: 8px; }
+  #hud .label { color: var(--text-muted); font-weight: 500; font-size: 10px; }
+  #hud .value { color: var(--green-dark); font-weight: 700; font-family: monospace; font-size: 11px; }
+  #hud .badge {
+    display: inline-block; margin-top: 4px;
+    padding: 2px 6px; border-radius: 4px;
+    font-size: 9px; letter-spacing: 0.2px;
+    background: var(--green-soft); color: var(--green-dark);
+    border: 1px solid #bbf0dc;
+    font-weight: 600;
+  }
+
+  #statusPill {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--green-dark);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    z-index: 5;
+  }
+  #statusPill .dot {
+    width: 6.5px; height: 6.5px;
+    background: #10b981;
+    border-radius: 50%;
+  }
+
+  #alarmBanner {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.08);
+    display: none;
+    align-items: center;
+    gap: 6px;
+    z-index: 10;
+    white-space: nowrap;
+  }
+  #alarmBanner .alarm-dot {
+    width: 6px;
+    height: 6px;
+    background: #ef4444;
+    border-radius: 50%;
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="alarmBanner">
+    <span class="alarm-dot"></span>
+    Alerta: condición crítica detectada
+  </div>
+
+  <div id="hud">
+    <div class="row">
+      <span class="label">Foco / Fan:</span>
+      <span class="value" id="hudActuadores">-- / --</span>
+    </div>
+    <div class="badge">NODO SE-01</div>
+  </div>
+
+  <div id="statusPill">
+    <span class="dot"></span> API en Vivo
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<script>
+const state = {
+  temperatura: 37.5,
+  humedad: 58.0,
+  servo_ang: 45,
+  espacios_libres: 1,
+  huevos_count: 2,
+  foco: "OFF",
+  fan: "OFF",
+  alarma: false
+};
+
+const API_URL = "http://127.0.0.1:5000/datos";
+
+setInterval(async () => {
+  try {
+    const res = await fetch(API_URL);
+    if (res.ok) {
+      const data = await res.json();
+      state.temperatura = parseFloat(data.temperatura) || state.temperatura;
+      state.humedad = parseFloat(data.humedad) || state.humedad;
+      state.espacios_libres = data.espacios_libres !== undefined ? data.espacios_libres : 1;
+      state.huevos_count = Math.max(0, 3 - state.espacios_libres);
+      state.foco = data.foco || (state.temperatura < 37.2 ? "ON" : "OFF");
+      state.fan = data.fan || (state.temperatura >= 38.0 ? "ON" : "OFF");
+      state.alarma = data.alarma === 1 || data.alarma === true || state.temperatura >= 38.5;
+
+      if (frameCount % 120 === 0) {
+        state.servo_ang = state.servo_ang === 45 ? -45 : 45;
+      }
+
+      actualizarHUD();
+    }
+  } catch (err) {
+    
+  }
+}, 2000);
+
+function actualizarHUD() {
+  document.getElementById('hudActuadores').textContent = state.foco + ' / ' + state.fan;
+  document.getElementById('alarmBanner').style.display = state.alarma ? 'flex' : 'none';
+}
+
+let particulas = [];
+const NUM_PARTICULAS = 75;
+
+function setup() {
+  const canvas = createCanvas(windowWidth, windowHeight);
+  canvas.parent('wrap');
+  angleMode(DEGREES);
+
+  for (let i = 0; i < NUM_PARTICULAS; i++) {
+    particulas.push({
+      rad: random(50, 225),
+      ang: random(360),
+      vel: random(0.2, 0.7),
+      tam: random(3.0, 6.0)
+    });
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+
+function draw() {
+  const cx = width / 2;
+  const cy = height / 2;
+
+  const s = min(width, height) / 440;
+
+  background(255, 255, 255);
+
+  stroke(214, 211, 201);
+  strokeWeight(2 * s);
+  fill(248, 247, 242);
+  rectMode(CENTER);
+  rect(cx, cy, 390 * s, 390 * s, 16 * s);
+
+  const factorHumedad = map(state.humedad, 30, 85, 0.6, 2.0);
+  for (let p of particulas) {
+    p.ang += p.vel * factorHumedad;
+    let px = cx + cos(p.ang) * (p.rad * s);
+    let py = cy + sin(p.ang) * (p.rad * 0.75 * s);
+
+    noStroke();
+    fill(2, 132, 199, 80);
+    circle(px, py, (p.tam + 3.0) * s);
+
+    fill(14, 165, 233, 240);
+    circle(px, py, p.tam * s);
+  }
+
+  if (state.foco === "ON") {
+    fill(245, 158, 11, 220 + 35 * sin(frameCount * 6));
+    stroke(251, 191, 36);
+    ellipse(cx, cy - 165 * s, 26 * s, 26 * s);
+  } else {
+    fill(51, 65, 85);
+    stroke(71, 85, 105);
+    ellipse(cx, cy - 165 * s, 22 * s, 22 * s);
+  }
+
+  push();
+  translate(cx + 172 * s, cy);
+  fill(30, 41, 59);
+  stroke(state.fan === "ON" ? color(56, 189, 248) : color(71, 85, 105));
+  rect(0, 0, 20 * s, 54 * s, 4 * s);
+  if (state.fan === "ON") {
+    stroke(56, 189, 248);
+    line(-5 * s, (-16 + (frameCount % 10)) * s, 5 * s, (-8 + (frameCount % 10)) * s);
+    line(-5 * s, (4 + (frameCount % 10)) * s, 5 * s, (12 + (frameCount % 10)) * s);
+  }
+  pop();
+
+  push();
+  translate(cx, cy);
+  rotate(state.servo_ang);
+
+  fill(2, 132, 199);
+  stroke(56, 189, 248);
+  strokeWeight(2.5 * s);
+  ellipse(0, 0, 240 * s, 240 * s);
+
+  fill(15, 23, 42);
+  stroke(71, 85, 105);
+  ellipse(0, 0, 36 * s, 36 * s);
+
+  const tNorm = map(state.temperatura, 32, 42, 0, 1);
+  const angulos = [-90, 30, 150];
+  for (let i = 0; i < 3; i++) {
+    const radioCavidad = 72 * s;
+    const hx = cos(angulos[i]) * radioCavidad;
+    const hy = sin(angulos[i]) * radioCavidad;
+
+    if (i < state.huevos_count) {
+      push();
+      translate(hx, hy);
+      rotate(-state.servo_ang);
+
+      const colorHuevo = lerpColor(color(254, 240, 138), color(234, 88, 12), tNorm);
+      fill(colorHuevo);
+      stroke(180, 83, 9);
+      strokeWeight(1.8 * s);
+      ellipse(0, 0, 44 * s, 58 * s);
+
+      noStroke();
+      fill(255, 255, 255, 70);
+      ellipse(-7 * s, -11 * s, 11 * s, 16 * s);
+      pop();
+    } else {
+      fill(15, 23, 42);
+      stroke(148, 163, 184);
+      strokeWeight(1.8 * s);
+      ellipse(hx, hy, 46 * s, 46 * s);
+
+      noStroke();
+      fill(100, 116, 139);
+      textAlign(CENTER, CENTER);
+      textSize(8.5 * s);
+      text("LIBRE", hx, hy);
+    }
+  }
+  pop();
+
+  if (state.alarma) {
+    noFill();
+    let alfaRojo = 140 + 115 * sin(frameCount * 8);
+    stroke(220, 38, 38, alfaRojo);
+    strokeWeight(4.5 * s);
+    rect(cx, cy, 392 * s, 392 * s, 16 * s);
+  }
+}
+</script>
+</body>
+</html>

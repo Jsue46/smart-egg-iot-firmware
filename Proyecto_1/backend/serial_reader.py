@@ -83,15 +83,21 @@ def leer_serial():
                         ultimo_dato = data
                         guardar_lectura(data)
         except Exception as e:
-            # Si no hay Arduino, genera datos simulados e intenta reconectar
-            print(f"Arduino no encontrado ({e}). Reintentando en 2s (simulando dato temporal)...")
+            t = round(random.uniform(36.5, 39.0), 1)
+            h = round(random.uniform(48.0, 67.0), 1)
+            
+            # Lógica automática según temperatura
+            foco_estado = "ON" if t < 37.3 else "OFF"
+            fan_estado = "ON" if t >= 38.0 else "OFF"
+            alarma_estado = t >= 38.5 or h < 50.0 or h > 65.0
+
             data = {
-                "temperatura": round(random.uniform(36.5, 39.0), 1),
-                "humedad": round(random.uniform(48.0, 67.0), 1),
+                "temperatura": t,
+                "humedad": h,
                 "espacios_libres": random.randint(0, 3),
-                "foco": "ON",
-                "fan": "OFF",
-                "alarma": random.random() < 0.2
+                "foco": foco_estado,
+                "fan": fan_estado,
+                "alarma": alarma_estado
             }
             ultimo_dato = data
             guardar_lectura(data)

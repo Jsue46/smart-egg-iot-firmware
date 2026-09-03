@@ -1,176 +1,105 @@
-# SmartEgg: Incubadora Inteligente Io - Grupo 7
+# SmartEgg IoT — Documentación Técnica del Proyecto 1
 
-## 1. Descripción de la solución.  
-La Facultad de Ciencias Agronómicas de la USAC identificó que los pequeños productores avícolas de la región experimentan pérdidas del 30% al 40% en sus procesos de incubación debido a factores críticos: control manual e impreciso de temperatura y humedad, volteo inconsistente de los huevos, falta de monitoreo continuo y ausencia de registros digitales.
+## 1. Descripción de la Solución y Continuidad respecto a la Práctica 1
 
-**SmartEgg** es una solución embebida e IoT diseñada como prototipo funcional para automatizar y optimizar el entorno de incubación:
-- **Control Ambiental Automático:** Lectura en tiempo real de temperatura y humedad mediante un sensor digital (DHT11/DHT22), manteniendo el rango térmico óptimo de **37.0 °C a 38.0 °C** y humedad relativa entre **50% y 65%**.
-- **Accionamiento por Umbrales:** Control de una fuente de calefacción (bombilla/celda peltier) y ventilación forzada mediante módulos de relé.
-- **Rotación Automatizada:** Simulación del volteo periódico de huevos mediante servomotor ($\pm45^\circ$ cada ciclo).
-- **Sistema de Alerta y Monitoreo Local:** Alarma sonora mediante buzzer ante anomalías y visualización en tiempo real en pantalla LCD 16x2 vía protocolo I2C.
-- **Telemetría e Integración IoT:** Transmisión de datos serial UART/USB hacia un backend centralizado para persistencia en base de datos, visualización en dashboard web/móvil y exportación de reportes técnicos en PDF.
+### 1.1 Contexto y Evolución del Sistema
+En la **Práctica 1**, el sistema *SmartEgg* se concibió como un prototipo funcional monolítico enfocado en la adquisición física y el control básico de una incubadora avícola automatizada. Dicha fase inicial integró la lectura de sensores de temperatura y humedad (DHT11), detección de presencia de huevos mediante finales de carrera, actuación térmica mediante relés (foco calefactor y ventilador extractor), el movimiento oscilatorio mecánico de una bandeja giratoria controlada por servomotor ($\pm45^\circ$) y una aplicación de escritorio/web respaldada por una base de datos local SQLite y una API REST desarrollada en Flask.
 
----
-## Capas del Framework IoT.  
-El sistema SmartEgg implementa una arquitectura estructurada en las 4 capas del modelo IoT:  
-![capas](imagenes/capasFramework.png)
-
-## Fotografías del prototipo (mockup, proceso de elaboración y prototipo final). 
-### Mockups del Prototipo físico  
-Previo al ensamblado final, se concibió el diseño estructural de la incubadora para garantizar aislamiento térmico y visibilidad del proceso:  
-![muckupMaqueta](imagenes/mockupMaqueta.png)  
-
-- **Cámara Superior de Acrílico:** Cubo transparente para monitoreo visual directo con ventilador extractor lateral de 12V y bombilla incandescente como fuente de calor.
-- **Mecanismo de Volteo 3D:** Disco rotativo impreso en 3D con 3 cavidades para huevos, conectado directamente al eje del servomotor para generar una oscilación periódica de $\pm 45^\circ$.
-- **Compartimento Inferior de Encapsulado:** Base aislada para ocultar el microcontrolador (Arduino Mega), los módulos de relé y el cableado de potencia.
-
-### Fotografías del proceso de elaboración  
-Durante la fase de manufactura se realizaron cortes a medida para el ensamblado del habitáculo térmico en láminas de acrílico transparente, asegurando el sellado perimetral y la perforación para el extractor de aire lateral. En paralelo, se implementó la base inferior de encapsulado para alojar el microcontrolador, la etapa de potencia con relés y la fuente de alimentación, aislando el cableado de la cámara de incubación.  
-![proceso1](imagenes/proceso1.jpeg)  
-![proceso2](imagenes/proceso2.jpeg)  
-![proceso3](imagenes/proceso3.jpeg)  
-![proceso4](imagenes/proceso4.jpeg)  
-![proceso5](imagenes/proceso5.jpeg)  
-* **Impresión 3D:** Fabricación del disco circular de 3 cavidades diseñado para acoplarse directamente al eje del servomotor y permitir el balanceo periódico de los huevos.
-* **Etapa de Potencia:** Instalación del sócate para la bombilla incandescente, ventilador de enfriamiento y cableado hacia el compartimento inferior.  
-
-### Fotografías del prototipo final  
-El prototipo final presenta un encapsulado profesional que separa la cámara de incubación del compartimento electrónico. Los cables no se encuentran expuestos a la vista, garantizando la estética y seguridad requeridas para un Producto Mínimo Viable.  
-![prototipo1](imagenes/prototipo1.jpeg)  
-![prototipo2](imagenes/prototipo2.jpeg)  
-* **Cámara de Incubación:** Espacio transparente con sensor DHT11 ubicado en pared interior, foco calefactor y plato rotativo 3D con un huevo cargado para validación.
-* **Encapsulado Inferior:** Casing que oculta el Arduino Mega, el módulo de relé y los empalmes eléctricos, permitiendo únicamente la salida del cable de comunicación serial USB hacia el computador.
-
-
-## Mockups de la Aplicación Web/Móvil.  
-A continuación se presentan los prototipos visuales de la plataforma IoT diseñados para entornos de escritorio y dispositivos móviles:  
-![mockup-web](imagenes/mockup1.png)  
-![mockup-web](imagenes/mockup2.png)   
-![mockup-web](imagenes/mockup3.png)  
-
-## Diagrama de Conexiones  
-Para validar el conexionado de señales de control, buses de comunicación y líneas de potencia antes del ensamblado físico, se estructuró la topología eléctrica completa mediante la plataforma de simulación **Wokwi**:  
-![conexiones](imagenes/DiagramaDeConexiones.png)   
-### Especificación de Pines y Distribución de Señales:
-* **Sensor Digital DHT11 (Pin 2):** Comunicación digital por protocolo 1-Wire para muestreo de variables ambientales (temperatura y humedad).
-* **Líneas de Interrupción por Hardware:**
-  * `Pin 3` (Interrupción Externa 0): Conectado al pulsador principal con resistencia Pull-Up para control de encendido/standby (`ISR_toggleSistema`).
-  * `Pin 18` (Interrupción Externa 5): Entrada de interrupción secundaria para eventos de diagnóstico y prueba (`ISR_eventoSecundario`).
-* **Control de Potencia y Actuadores:**
-  * `Pin 6` (MOSFET / Salida Digital): Control de conmutación para el ventilador extractor de 12V.
-  * `Pin 7` (Relé / Salida Digital): Control de conmutación para la bombilla térmica incandescente (lógica activa en bajo).
-  * `Pin 8` (Salida Digital): Disparo de alarma sonora mediante buzzer activo ante anomalías térmicas o de humedad.
-  * `Pin 9` (PWM): Línea de control del servomotor MG996R para el mecanismo oscilatorio de la bandeja ($\pm45^\circ$).
-* **Detección de Huevos / Finales de Carrera:** Pines digitales `49`, `51` y `53` con modo `INPUT_PULLUP` para monitoreo de los 3 espacios disponibles.
-* **Bus de Comunicación I2C:** Pines `20 (SDA)` y `21 (SCL)` para despliegue local de telemetría en la pantalla LCD 16x2 (`0x27`).
-
-## Diagrama de Arquitectura de Software.
-El flujo de datos del ecosistema se distribuye de la siguiente manera:  
-![diagrama arquitectura](imagenes/diagramaArquitectura.png)  
-
-## Diagrama de Automatización (Interrupciones / Tasks)
-![automatizacion](imagenes/diagramaAutomatizacion.png)  
-
-El Arduino UNO no tiene un sistema operativo, así que la "multitarea" se logra con dos mecanismos combinados:  
-
-1. **Interrupciones por hardware (asíncronas):** los pines 3 y 18 disparan una ISR de inmediato sin importar en qué parte del `loop()` esté el programa. Las ISR solo cambian una bandera `volatile` (con antirrebote de 250 ms) — nunca hacen trabajo pesado dentro de la interrupción, que es la buena práctica.
-2. **Tareas cooperativas con `millis()` (síncronas):** dentro de `loop()`, dos bloques comparan el tiempo transcurrido contra un intervalo (`previousServoTime`, `previousSensorTime`) para decidir si les toca ejecutarse. Esto emula el comportamiento de tareas independientes de FreeRTOS, pero sin bloquear el `loop()` con `delay()`.
-
-## Documentación de la API 
-La plataforma cuenta con un backend desarrollado en **Python (Flask)** que expone una API RESTful para la sincronización y persistencia de las lecturas del microcontrolador, la gestión de lotes/huevos de incubación, el registro de alarmas y la exportación de reportes.
-
-* **Host Base:** `http://127.0.0.1:5000` (Red Local)
-* **Formato de Comunicación:** `application/json` (salvo descargas de archivos)
-* **Herramienta de Pruebas y Validación:** Postman
+Para este **Proyecto 1**, la solución evoluciona desde un sistema aislado hacia una **arquitectura distribuida IoT de grado industrial**, desacoplada, observable y contenerizada. El objetivo principal de esta transición es mitigar la latencia en la propagación de eventos críticos, garantizar la persistencia relacional concurrente de los datos de telemetría y dotar al operador de mecanismos analíticos y visuales interactivos de alto rendimiento.
 
 ---
 
-### Resumen de Endpoints Disponibles
+### 1.2 Arquitectura y Componentes de Continuidad
 
-| Método | Endpoint | Descripción | Código Éxito |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/datos` | Obtiene la telemetría en tiempo real recibida por Serial. | `200 OK` |
-| `GET` | `/historial` | Obtiene el historial de las últimas 100 lecturas ambientales. | `200 OK` |
-| `POST` | `/huevo` | Registra un nuevo huevo/lote en la base de datos. | `201 Created` |
-| `GET` | `/huevos` | Retorna el listado completo de huevos rotulados registrados. | `200 OK` |
-| `GET` | `/alarmas` | Retorna el historial de las últimas 50 alertas del sistema. | `200 OK` |
-| `GET` | `/reporte` | Genera y descarga el informe oficial en formato PDF. | `200 OK` |
+El proyecto mantiene la lógica de hardware y de negocio establecida en la práctica inicial, expandiendo sus capacidades a través de los siguientes ejes de continuidad:
+
+* **Capa de Adquisición Física (Microcontrolador & Serial):**
+  Se preserva la integración con el microcontrolador físico mediante comunicación serial UART. El backend continúa procesando las tramas JSON estructuradas enviadas desde el hardware, garantizando resiliencia operativa mediante hilos daemon de reconexión automática e inyección de datos de contingencia en caso de desconexión física. Como ampliación del proyecto, se incorpora el registro físico de acceso a cabina mediante switch/sensor para el control de operadores.
+
+* **Núcleo del Backend (Python & Flask):**
+  La API REST conserva y estandariza los contratos de datos originales (`/datos`, `/historial`, `/huevos`, `/alarmas`, `/reporte`), ampliándose funcionalmente como un **nodo publicador MQTT**. Cada lectura serial capturada se procesa hacia la base de datos relacional y se despacha de forma asíncrona hacia los tópicos correspondientes del broker.
+
+* **Transición de Persistencia (SQLite a Base de Datos Relacional Contenerizada):**
+  El esquema inicial de almacenamiento migra hacia un motor relacional formal orquestado en Docker (PostgreSQL/MySQL), integrando un modelo entidad-relación normalizado que soporta el ciclo de vida de lotes, operadores designados (Operador 1, Operador 2, Administrador), bitácora de accesos de puerta y métricas históricas indexadas.
+
+* **Capa de Transporte Híbrida (REST + MQTT sobre WebSockets):**
+  A diferencia de la Práctica 1, donde toda la actualización dependía de sondeo periódico HTTP (*polling*), el Proyecto 1 desacopla las alertas críticas. Los eventos de alarma y cambios de estado se distribuyen mediante el protocolo MQTT bajo calidad de servicio (QoS 1), retención de mensajes y Last Will and Testament (LWT), permitiendo que las alertas se reflejen en la interfaz en menos de 3 segundos sin recargar el navegador.
+
+* **Ecosistema de Frontend y Observabilidad (Next.js & Grafana):**
+  La interfaz de usuario pasa a construirse sobre Next.js (React + TypeScript) con una estética editorial botánica adaptada a la identidad del proyecto. En este entorno convergen:
+  1. Paneles analíticos construidos con **Chart.js** para el seguimiento continuo de tendencias térmicas y ocupación histórica.
+  2. Un lienzo interactivo en 2D desarrollado con **p5.js** que renderiza digitalmente el habitáculo mecánico, el plato de soporte a $\pm45^\circ$, el flujo dinámico de vapor y las advertencias de cabina consumiendo la telemetría en vivo.
+  3. Dashboards avanzados en **Grafana** conectados al broker MQTT y a la base de datos para la supervisión y auditoría de la infraestructura operativa.
+
+## 2. Diagrama de arquitectura general
+## 2. Arquitectura General del Sistema
+
+### 2.1 Diagrama de Arquitectura
+
+![diagrama arquitectura](<imagenes/Diagrama de arquitectura genera.png>)
 
 ---
 
-### Detalle de Endpoints y Evidencias de Postman
-#### 1. Obtener Telemetría en Tiempo Real
-* **Ruta:** `GET /datos`
-* **Descripción:** Retorna los valores más recientes enviados desde el microcontrolador a través del puerto serial (o el último registro guardado en base de datos si no hay dato en memoria).
-* **Códigos de Respuesta:**
-  * `200 OK`: Datos obtenidos con éxito.
-  * `503 Service Unavailable`: `{"mensaje": "Sin datos aún"}` (sistema inicializando).
+### 2.2 Descripción y Detalle de Conexiones
 
-**Respuesta esperada:**  
-![datos](imagenes/getDatos.png)
+La arquitectura de **SmartEgg IoT** desacopla la adquisición de señales físicas, la persistencia transaccional, el despacho de telemetría asíncrona y la observabilidad distribuida. Cada enlace cumple una función técnica específica dentro del flujo de datos:
 
-#### 2. Consultar Historial de Lecturas
-* **Ruta:** `GET /historial`
-* **Descripción:** Retorna una lista con las últimas 100 mediciones registradas de temperatura, humedad, estados de relés y conteo de espacios.
-* **Códigos de Respuesta:**
-  * `200 OK`: Datos obtenidos con éxito.
+* **1. Componentes, Módulos, Sensores y Actuadores $\longleftrightarrow$ Microcontrolador (Capa Física / GPIO):**
+  * **Protocolo / Interfaz:** Conexiones directas por entradas y salidas analógicas/digitales (GPIO) e interfaces de un solo hilo (One-Wire).
+  * **Descripción:** Los transductores físicos (sensor DHT11 para temperatura y humedad, finales de carrera para conteo de huevos y sensor/switch de acceso de puerta) envían sus señales eléctricas al microcontrolador. En sentido inverso, el microcontrolador conmuta los actuadores de cabina (relés para foco calefactor y ventilador extractor) y envía el tren de pulsos PWM hacia el servomotor MG996R para el ciclo de inclinación de la bandeja a $\pm45^\circ$.
 
-**Respuesta esperada:**  
-![historial](imagenes/getHistorial.png)
+* **2. Microcontrolador $\longrightarrow$ Backend REST/API (`Serial Bus`):**
+  * **Protocolo / Interfaz:** Comunicación Serial UART sobre puerto USB (9600 baudios).
+  * **Descripción:** El microcontrolador serializa periódicamente las lecturas en una trama de texto JSON (`{"temperatura": 37.5, "humedad": 58.0, ...}`). El backend mantiene un hilo trabajador en segundo plano (*daemon thread*) que escucha continuamente el puerto serial con reconexión automática, deserializa el payload y lo pasa a las capas de persistencia y despacho.
 
-#### 3. Registrar Huevo / Ficha de Identificación
-* **Ruta:** `POST /huevo`
-* **Descripción:** Inserta un nuevo registro en la tabla de huevos rotulados para control y trazabilidad en la incubadora.
-* **Encabezados requeridos:** `Content-Type: application/json`
-* **Cuerpo de la Petición (Request Body):**  
-```json
-{
-  "lote": "LOTE-2026-A",
-  "etiqueta": "HUEVO-001",
-  "tecnico": "Carlos Perez",
-  "notas": "Temperatura inicial normal, sin fisuras."
-}
-```
-* **Códigos de Respuesta:**
-  * `201 Created`: `{"mensaje": "Huevo registrado"}`
-  * `400 Bad Request`: `{"error": "Campo requerido: [nombre_campo]"}` (en caso de omitir lote, etiqueta o tecnico).
+* **3. Backend REST/API $\longleftrightarrow$ Base de Datos (`Query` / Persistencia):**
+  * **Protocolo / Interfaz:** Conector SQL / TCP sobre red interna de contenedores.
+  * **Descripción:** Conexión bidireccional transaccional. En sentido ascendente, el backend ejecuta sentencias `INSERT` para almacenar cada lectura de telemetría, registro de alarmas críticas y eventos de apertura/cierre de puerta. En sentido descendente, atiende peticiones analíticas y consultas históricas mediante sentencias `SELECT` indexadas (por ejemplo, para responder al endpoint `/historial` y nutrir el generador de reportes PDF).
 
-**Respuesta esperada:**  
-![post-huevo](imagenes/postHuevo.png)
+* **4. Backend REST/API $\longleftrightarrow$ Frontend Web (`Request` / HTTP REST):**
+  * **Protocolo / Interfaz:** HTTP/1.1 (JSON) sobre TCP/IP con soporte CORS.
+  * **Descripción:** Comunicación cliente-servidor sincrónica bajo demanda. El frontend consume los contratos de datos expuestos por la API REST (`GET /datos`, `GET /historial`, `GET /huevos`, `POST /huevo`, `GET /reporte`). A través de este canal, la interfaz alimenta periódicamente las tarjetas analíticas de Chart.js y proporciona las lecturas de estado al lienzo interactivo de p5.js.
 
-#### 4. Listar Huevos Registrados
-* **Ruta:** `GET /huevos`
-* **Descripción:** Consulta el inventario histórico de huevos/lotes ingresados a la incubadora, ordenados cronológicamente.
-* **Códigos de Respuesta:**
-  * `200 OK`: Datos obtenidos con éxito.
+* **5. Backend REST/API $\longrightarrow$ MQTT Broker (`Publisher`):**
+  * **Protocolo / Interfaz:** Protocolo MQTT (v3.1.1 / v5.0) sobre TCP (puerto estándar 1883).
+  * **Descripción:** El backend opera como un cliente publicador (*Publisher*). Cada vez que valida una nueva muestra del puerto serial o detecta condiciones de riesgo térmico/humedad, publica la información en tópicos jerárquicos estructurados (por ejemplo, `smartegg/{id}/sensores/temperatura` y `smartegg/{id}/alarmas/critica`). En las alertas críticas se configura QoS 1 y mensajes retenidos (*retained*), garantizando la entrega confiable y el estado Last Will and Testament (LWT) para supervisión de conectividad.
 
-**Respuesta esperada:** 
-![get-huevo](imagenes/getHuevos.png)
+* **6. MQTT Broker $\longrightarrow$ Frontend Web (`WebSockets` / Tiempo Real):**
+  * **Protocolo / Interfaz:** MQTT sobre WebSockets (`ws://` / `wss://` en el puerto 9001).
+  * **Descripción:** El frontend actúa como suscriptor (*Subscriber*). Mantiene un socket abierto contra el broker mediante la librería `mqtt.js` escuchando tópicos críticos. Este canal push elimina la necesidad de sondeo HTTP (*polling*) constante, permitiendo desplegar alertas sonoras y visuales en la interfaz de operador en menos de 3 segundos ante contingencias ambientales o accesos no autorizados.
 
-#### 5. Consultar Historial de Alarmas
-* **Ruta:** `GET /alarmas`
-* **Descripción:** Retorna el registro de las últimas 50 alertas generadas cuando las variables ambientales superan o caen por debajo de los umbrales configurados.
-* **Códigos de Respuesta:**
-  * `200 OK`: Datos obtenidos con éxito.
+* **7. MQTT Broker $\longrightarrow$ Grafana (`Subscribe` / Telemetría en Vivo):**
+  * **Protocolo / Interfaz:** Data Source MQTT / WebSockets.
+  * **Descripción:** Grafana se suscribe de manera directa a los tópicos de telemetría instantánea y status LWT del broker. Esto permite actualizar en tiempo real paneles de instrumentos visuales (medidores tipo *Gauge*, gráficos de serie temporal instantáneos y estados de salud del nodo) con latencia mínima y sin sobrecargar el backend.
 
-**Respuesta esperada:**  
-![alarmas](imagenes/getAlarmas.png)
-
-#### 6. Descarga de Reporte en PDF
-* **Ruta:** `GET /reporte`
-* **Descripción:** Compila en tiempo real y descarga un archivo PDF con el resumen de lotes, técnicos, estadísticas de temperatura/humedad y registro de alarmas.
-* **Encabezados requeridos:** `Content-Type: application/pdf` y `Content-Disposition: attachment; filename=reporte_smartegg.pdf`
-* **Códigos de Respuesta:**
-  * `200 OK`: Datos obtenidos con éxito.
-
-**Respuesta esperada:**  
-![reporte](imagenes/getReporte.png)
-
-## Manual de Usuario
-**Este enlace redirecciona al manual de usuario de la práctica 1:**  
-[Manual De Usuario](ManualUsuario.md)
-
-## Captura de github de los commits. 
-![commits](imagenes/commitsRepositorio.png)
+* **8. Base de Datos $\longrightarrow$ Grafana (`Querys` / Analítica Histórica):**
+  * **Protocolo / Interfaz:** Driver nativo SQL (PostgreSQL/MySQL) sobre TCP.
+  * **Descripción:** Grafana ejecuta consultas directas de solo lectura contra el motor de base de datos relacional. Mediante agregaciones SQL (`AVG`, `MAX`, `MIN`), nutre tableros de analítica avanzada que muestran tendencias históricas semanales, duraciones acumuladas de alarmas térmicas y registros de acceso de los operadores a lo largo de los lotes de incubación.
 
 
+## 3. Documentación de la jerarquía de topics MQTT (nombre, publicador, suscriptores, formato del payload, QoS).
+
+
+## 4. Modelo entidad-relación de la base de datos.
+
+
+## 5. API Contracts del backend
+
+
+## 6. Capturas de los dashboards de Grafana 
+
+
+## 7. Explicación de los frameworks/librerías y enlace al video demostrativo
+
+
+## 8. Documento comparativo HTTP vs. MQTT 
+
+
+## 9. Instrucciones y evidencia de la orquestación con Docker (docker-compose y capturas de los contenedores en ejecución).
+
+
+
+## 10. Capturas de GitHub evidenciando los commits del equipo.
+
+
+## 11. Manual de usuario
