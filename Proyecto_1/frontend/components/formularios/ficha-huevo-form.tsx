@@ -37,7 +37,7 @@ function FichaCard({ lot }: { lot: Lot }) {
         <div><dt>Cantidad registrada</dt><dd>{lot.quantity} {lot.quantity === 1 ? "huevo" : "huevos"}</dd></div>
         <div><dt>Temperatura requerida</dt><dd><TemperatureIcon size={23} />{lot.requiredTemperature.toFixed(1)} °C</dd></div>
       </dl>
-      <div className="ficha-footer"><span /><p>Registro guardado localmente</p></div>
+      <div className="ficha-footer"><span /><p>Registro guardado en PostgreSQL</p></div>
     </motion.aside>
   );
 }
@@ -53,7 +53,7 @@ export function FichaHuevoForm() {
     defaultValues: { label: "", entryDate: today, quantity: 1, requiredTemperature: 37.5 },
   });
 
-  const submit = (values: FormValues) => {
+  const submit = async (values: FormValues) => {
     if (values.quantity > available) {
       const message = available === 0 ? "El disco está lleno; completa un ciclo antes de registrar otro huevo" : `Solo ${available} espacio disponible en el disco`;
       setError("quantity", { message });
@@ -61,7 +61,7 @@ export function FichaHuevoForm() {
       return;
     }
     try {
-      const lot = addLot(values);
+      const lot = await addLot(values);
       setCreated(lot);
       showToast({ title: "Ficha creada", message: `${lot.label} ya está disponible en el listado de lotes.`, tone: "success" });
     } catch (error) {

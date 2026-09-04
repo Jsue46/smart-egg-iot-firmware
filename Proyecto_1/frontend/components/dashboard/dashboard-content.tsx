@@ -6,7 +6,7 @@ import { SensorCard } from "@/components/sensores/sensor-card";
 import { useToast } from "@/components/ui/toast-provider";
 import { useSimulatedTelemetry } from "@/hooks/use-simulated-telemetry";
 import { AnalyticsCharts } from "@/components/graficas/AnalyticsCharts";
-import { IncubatorVisualizer } from "@/components/graficas/IncubatorVisualizer";
+import { IncubatorSignature } from "@/components/escena3d/incubator-signature";
 
 export function DashboardContent() {
   const telemetry = useSimulatedTelemetry();
@@ -18,7 +18,7 @@ export function DashboardContent() {
     showToast({
       tone: "info",
       title: telemetry.isPaused ? "Telemetría reanudada" : "Telemetría pausada",
-      message: telemetry.isPaused ? "Las lecturas vuelven a actualizarse cada 1.6 segundos." : "Los valores permanecerán fijos hasta que reanudes los datos.",
+      message: telemetry.isPaused ? "Las lecturas vuelven a actualizarse cada 2 segundos." : "Los valores permanecerán fijos hasta que reanudes los datos.",
     });
   };
   const showDemoAlarm = () => {
@@ -37,7 +37,7 @@ export function DashboardContent() {
           <button className="button ghost compact alert-action" type="button" onClick={showDemoAlarm}><AlarmIcon size={23} />Probar alerta</button>
         </div>
       </div>
-      <div className="section-heading"><div><p className="eyebrow">Lecturas del nodo SE-01</p><h2>Sensores en vivo</h2></div><span className="updated-label">Actualiza cada 1.6 s</span></div>
+      <div className="section-heading"><div><p className="eyebrow">Lecturas del nodo SE-01</p><h2>Sensores en vivo</h2></div><span className="updated-label">Actualiza cada 2 s</span></div>
       <motion.section
         className="dashboard-bento"
         aria-label="Estado y lecturas de la incubadora"
@@ -45,7 +45,18 @@ export function DashboardContent() {
         initial="hidden"
         animate="show"
       >
-        <IncubatorVisualizer />
+        <IncubatorSignature
+          angle={telemetry.servoAngle}
+          temperature={telemetry.temperature}
+          humidity={telemetry.humidity}
+          occupied={telemetry.occupied}
+          capacity={telemetry.capacity}
+          isAlarm={telemetry.isAlarm}
+          isOnline={telemetry.isOnline}
+          heaterOn={telemetry.heaterOn}
+          fanOn={telemetry.fanOn}
+          doorOpen={telemetry.doorOpen}
+        />
         <motion.article className="system-bento-card" variants={{ hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0 } }}>
           <div className="system-bento-head">
             <span className="system-bento-icon"><ConnectionIcon size={35} /></span>

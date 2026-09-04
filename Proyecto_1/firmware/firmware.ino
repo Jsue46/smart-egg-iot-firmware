@@ -45,6 +45,7 @@ unsigned long previousServoTime = 0;
 // NOTA: El PDF pide 120000 (2 minutos), pero se bajó a 5000 (5 segundos) para que puedas probar que funciona.
 const unsigned long servoInterval = 5000; 
 bool servoDerecha = true;
+int servoAngle = 135;
 
 unsigned long previousSensorTime = 0;
 const unsigned long sensorInterval = 2000;  // Lectura cada 2 segundos
@@ -94,9 +95,11 @@ void setup() {
   eggServo.attach(SERVO_PIN);
   
   // -- PRUEBA DE HARDWARE: Movimiento forzado al encender --
-  eggServo.write(45); 
+  servoAngle = 45;
+  eggServo.write(servoAngle);
   delay(1000);
-  eggServo.write(135);
+  servoAngle = 135;
+  eggServo.write(servoAngle);
   delay(1000);
   // ---------------------------------------------------------
   
@@ -133,10 +136,11 @@ void loop() {
     previousServoTime = currentMillis;
 
     if (servoDerecha) {
-      eggServo.write(45);  // -45 grados
+      servoAngle = 45;     // -45 grados respecto al centro
     } else {
-      eggServo.write(135); // +45 grados
+      servoAngle = 135;    // +45 grados respecto al centro
     }
+    eggServo.write(servoAngle);
     servoDerecha = !servoDerecha;
   }
 
@@ -233,7 +237,8 @@ void loop() {
     Serial.print(",\"espacios_libres\":"); Serial.print(espaciosLibres);
     Serial.print(",\"foco\":\"");          Serial.print(estadoFoco);
     Serial.print("\",\"fan\":\"");         Serial.print(estadoFan);
-    Serial.print("\",\"alarma\":");        Serial.print(alarmaActiva ? "true" : "false");
+    Serial.print("\",\"rotacion_grados\":"); Serial.print(servoAngle);
+    Serial.print(",\"alarma\":");          Serial.print(alarmaActiva ? "true" : "false");
     Serial.println("}");
   }
 }

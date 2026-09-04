@@ -14,6 +14,7 @@ import {
     Filler
     } from "chart.js";
     import { Line, Bar } from "react-chartjs-2";
+    import { API_BASE_URL } from "@/lib/config";
 
     ChartJS.register(
     CategoryScale,
@@ -40,7 +41,7 @@ import {
 
     const fetchHistorial = async () => {
         try {
-        const res = await fetch("http://127.0.0.1:5000/historial");
+        const res = await fetch(`${API_BASE_URL}/historial?limit=100`, { cache: "no-store" });
         if (res.ok) {
             const data: Lectura[] = await res.json();
             setHistorial(data.slice(0, 15).reverse());
@@ -56,7 +57,10 @@ import {
         return () => clearInterval(interval);
     }, []);
 
-    const labels = historial.map((h) => h.timestamp.split(" ")[1] || `${h.id}`);
+    const labels = historial.map((h) => {
+        const date = new Date(h.timestamp);
+        return Number.isNaN(date.getTime()) ? `${h.id}` : date.toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" });
+    });
 
     const lineData = {
         labels,

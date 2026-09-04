@@ -1,0 +1,20 @@
+FROM node:22-alpine
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
+
+ARG NEXT_PUBLIC_API_URL=http://localhost:5000
+ARG NEXT_PUBLIC_MQTT_WS_URL=ws://localhost:9001
+ARG NEXT_PUBLIC_NODE_ID=SE-01
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
+    NEXT_PUBLIC_MQTT_WS_URL=$NEXT_PUBLIC_MQTT_WS_URL \
+    NEXT_PUBLIC_NODE_ID=$NEXT_PUBLIC_NODE_ID \
+    NEXT_TELEMETRY_DISABLED=1
+
+COPY . ./
+RUN npm run build
+
+EXPOSE 3000
+CMD ["npm", "run", "start"]

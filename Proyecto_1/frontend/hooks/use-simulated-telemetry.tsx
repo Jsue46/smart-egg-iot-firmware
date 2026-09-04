@@ -9,11 +9,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import type { MqttClient } from "mqtt";
 import { authenticatedTechnician } from "@/lib/mock-data";
+import { API_BASE_URL, MQTT_WS_URL, NODE_ID } from "@/lib/config";
 import type { Alarm, Lot, TelemetryPoint, TelemetryState } from "@/lib/types";
 
 interface TelemetryContextValue extends TelemetryState {
-  addLot: (lot: Omit<Lot, "id" | "status" | "progress">) => Lot;
+  addLot: (lot: Omit<Lot, "id" | "status" | "progress">) => Promise<Lot>;
   togglePaused: () => void;
   triggerDemoAlarm: () => void;
 }
@@ -21,9 +23,43 @@ interface TelemetryContextValue extends TelemetryState {
 const TelemetryContext = createContext<TelemetryContextValue | null>(null);
 const CAPACITY = 3;
 
+function toDateOnly(value: unknown): string {
+  if (!value) return new Date().toISOString().slice(0, 10);
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? new Date().toISOString().slice(0, 10) : date.toISOString().slice(0, 10);
+}
+
+function toIso(value: unknown): string {
+  if (!value) return new Date().toISOString();
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+}
+
+function actuatorIsOn(value: unknown): boolean {
+  return ["ON", "1", "TRUE", "ENCENDIDO", "ACTIVO"].includes(String(value ?? "").trim().toUpperCase());
+}
+
+function doorIsOpen(value: unknown): boolean {
+  return ["ABRIR", "ABIERTO", "OPEN", "OPENED", "1", "TRUE"].includes(String(value ?? "").trim().toUpperCase());
+}
+
+function mqttAlarm(payload: any): Alarm {
+  const severity = payload.severidad === "warning" || payload.severity === "warning" ? "warning" : "critical";
+  return {
+    id: `AL-${payload.id ?? `${payload.tipo ?? "sistema"}-${payload.timestamp ?? Date.now()}`}`,
+    timestamp: toIso(payload.timestamp ?? payload.inicio_at),
+    title: payload.tipo ?? "SISTEMA",
+    detail: payload.mensaje ?? payload.descripcion ?? "Alarma reportada por el nodo",
+    severity,
+  };
+}
+
 export function TelemetryProvider({ children }: { children: ReactNode }) {
   const [temperature, setTemperature] = useState(0);
   const [humidity, setHumidity] = useState(0);
+  const [heaterOn, setHeaterOn] = useState(false);
+  const [fanOn, setFanOn] = useState(false);
+  const [doorOpen, setDoorOpen] = useState(false);
   const [servoAngle, setServoAngle] = useState(0);
   const [occupied, setOccupied] = useState(0);
   const [history, setHistory] = useState<TelemetryPoint[]>([]);
@@ -36,93 +72,187 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
   const fetchData = useCallback(async () => {
     if (isPaused) return;
     try {
-      const resDatos = await fetch("http://localhost:5000/datos");
+      const resDatos = await fetch(`${API_BASE_URL}/datos`, { cache: "no-store" });
       if (resDatos.ok) {
         const data = await resDatos.json();
-        setTemperature(data.temperatura || 0);
-        setHumidity(data.humedad || 0);
-        // Si data.espacios_libres es 3, entonces hay 0 ocupados. Si es 0 libres, hay 3 ocupados.
-        setOccupied(Math.max(0, CAPACITY - (data.espacios_libres || 0)));
+        setTemperature(Number(data.temperatura) || 0);
+        setHumidity(Number(data.humedad) || 0);
+        setHeaterOn(actuatorIsOn(data.foco));
+        setFanOn(actuatorIsOn(data.ventilador ?? data.fan));
+        if ("puerta" in data || "door" in data) setDoorOpen(doorIsOpen(data.puerta ?? data.door));
+        const restRotation = Number(data.rotacion_grados ?? data.servo_ang);
+        if (Number.isFinite(restRotation)) setServoAngle(restRotation);
+        setOccupied(Math.max(0, CAPACITY - (Number(data.espacios_libres) || 0)));
         setIsAlarm(data.alarma === 1 || data.alarma === true);
         setIsOnline(true);
       } else {
         setIsOnline(false);
       }
 
-      const resHistorial = await fetch("http://localhost:5000/historial");
+      const resHistorial = await fetch(`${API_BASE_URL}/historial?limit=100`, { cache: "no-store" });
       if (resHistorial.ok) {
         const histData = await resHistorial.json();
-        const mappedHistory = histData.map((d: any) => ({
-          at: new Date(d.timestamp).getTime(),
-          temperature: d.temperatura,
-          humidity: d.humedad,
-        })).reverse();
+        const mappedHistory = histData
+          .map((d: any) => ({
+            at: new Date(d.timestamp).getTime(),
+            temperature: Number(d.temperatura) || 0,
+            humidity: Number(d.humedad) || 0,
+          }))
+          .filter((point: TelemetryPoint) => Number.isFinite(point.at))
+          .reverse();
         setHistory(mappedHistory);
       }
 
-      const resHuevos = await fetch("http://localhost:5000/huevos");
+      const resHuevos = await fetch(`${API_BASE_URL}/huevos`, { cache: "no-store" });
       if (resHuevos.ok) {
         const huevosData = await resHuevos.json();
-        setLots(huevosData.map((h: any) => ({
-          id: `LT-${h.id}`,
-          label: h.etiqueta,
-          entryDate: h.fecha_ingreso ? h.fecha_ingreso.split(" ")[0] : new Date().toISOString().split(" ")[0],
-          quantity: 1, // Por simplicidad, 1 espacio por registro
-          requiredTemperature: 37.5,
-          status: "incubando",
-          progress: 50,
-        })));
+        setLots(
+          huevosData.map((h: any) => ({
+            id: `LT-${h.id}`,
+            label: h.etiqueta,
+            entryDate: toDateOnly(h.fecha_ingreso),
+            quantity: Number(h.cantidad ?? h.quantity) || 1,
+            requiredTemperature: Number(h.temperatura_requerida ?? h.requiredTemperature) || 37.5,
+            status: h.status === "completo" ? "completo" : "incubando",
+            progress: Number(h.progress) || 50,
+          })),
+        );
       }
 
-      const resAlarmas = await fetch("http://localhost:5000/alarmas");
+      const resAlarmas = await fetch(`${API_BASE_URL}/alarmas`, { cache: "no-store" });
       if (resAlarmas.ok) {
         const alarmasData = await resAlarmas.json();
-        setAlarms(alarmasData.map((a: any) => ({
-          id: `AL-${a.id}`,
-          timestamp: a.timestamp ? a.timestamp.replace(" ", "T") : new Date().toISOString(),
-          title: a.tipo,
-          detail: a.descripcion,
-          severity: "critical",
-        })));
+        setAlarms(alarmasData.map((alarm: any) => mqttAlarm({ ...alarm, id: alarm.id })));
+        setIsAlarm(
+          alarmasData.some((alarm: any) => alarm.activa === true || alarm.activa === 1),
+        );
       }
-    } catch (e) {
-      console.log("No backend connection");
+
+      const resPuerta = await fetch(`${API_BASE_URL}/accesos-puerta?limit=1`, { cache: "no-store" });
+      if (resPuerta.ok) {
+        const puertaData = await resPuerta.json();
+        const lastDoorEvent = puertaData?.[0];
+        if (lastDoorEvent?.accion) setDoorOpen(doorIsOpen(lastDoorEvent.accion));
+      }
+    } catch {
       setIsOnline(false);
     }
   }, [isPaused]);
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(() => {
-      fetchData();
-      setServoAngle(prev => (prev > 0 ? -45 : 45));
-    }, 2000);
-    return () => clearInterval(interval);
+    const interval = window.setInterval(fetchData, 2000);
+    return () => window.clearInterval(interval);
   }, [fetchData]);
 
+  useEffect(() => {
+    let disposed = false;
+    let client: MqttClient | null = null;
+
+    const connectMqtt = async () => {
+      try {
+        const mqtt = await import("mqtt");
+        if (disposed) return;
+        client = mqtt.connect(MQTT_WS_URL, {
+          clientId: `smartegg-web-${Math.random().toString(16).slice(2)}`,
+          clean: true,
+          reconnectPeriod: 2000,
+          connectTimeout: 5000,
+        });
+
+        client.on("connect", () => {
+          setIsOnline(true);
+          client?.subscribe(
+            [
+              `smartegg/${NODE_ID}/status`,
+              `smartegg/${NODE_ID}/actuadores/estado`,
+              `smartegg/${NODE_ID}/alarmas/critica`,
+              `smartegg/${NODE_ID}/puerta/evento`,
+            ],
+            { qos: 1 },
+          );
+        });
+        client.on("message", (topic, message) => {
+          try {
+            const payload = JSON.parse(message.toString());
+            if (topic.endsWith("/status")) {
+              setIsOnline(payload.estado === "online");
+            } else if (topic.endsWith("/actuadores/estado")) {
+              const mqttRotation = Number(payload.rotacion_grados ?? payload.servo_ang);
+              if (Number.isFinite(mqttRotation)) setServoAngle(mqttRotation);
+              if ("foco" in payload) setHeaterOn(actuatorIsOn(payload.foco));
+              if ("ventilador" in payload || "fan" in payload) setFanOn(actuatorIsOn(payload.ventilador ?? payload.fan));
+            } else if (topic.endsWith("/alarmas/critica")) {
+              const alarm = mqttAlarm(payload);
+              setIsAlarm(payload.activa === true || payload.activa === 1);
+              setAlarms((current) => {
+                const withoutCurrent = current.filter((item) => item.id !== alarm.id);
+                return [alarm, ...withoutCurrent].slice(0, 50);
+              });
+            } else if (topic.endsWith("/puerta/evento")) {
+              setDoorOpen(doorIsOpen(payload.accion ?? payload.action));
+            }
+          } catch {
+            // Ignore non-JSON broker messages on the application topics.
+          }
+        });
+      } catch {
+        // The REST API remains usable when the optional WebSocket broker is down.
+      }
+    };
+
+    connectMqtt();
+    return () => {
+      disposed = true;
+      if (client) client.end(true);
+    };
+  }, []);
+
   const addLot = useCallback(
-    (input: Omit<Lot, "id" | "status" | "progress">) => {
-      fetch("http://localhost:5000/huevo", {
+    async (input: Omit<Lot, "id" | "status" | "progress">): Promise<Lot> => {
+      const response = await fetch(`${API_BASE_URL}/huevo`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          lote: "LT-NUEVO",
+          lote: `LT-${Date.now()}`,
           etiqueta: input.label,
           tecnico: authenticatedTechnician.name,
+          entryDate: input.entryDate,
+          quantity: input.quantity,
+          requiredTemperature: input.requiredTemperature,
           notas: "",
-        })
-      }).then(() => fetchData());
-      
-      const newLot: Lot = { ...input, id: "TEMP", status: "incubando", progress: 1 };
-      return newLot;
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error ?? "No fue posible registrar el lote");
+      }
+      await fetchData();
+      return { ...input, id: `LT-${result.id ?? Date.now()}`, status: "incubando", progress: 1 };
     },
-    [fetchData]
+    [fetchData],
   );
+
+  const triggerDemoAlarm = useCallback(() => {
+    const alarm: Alarm = {
+      id: `DEMO-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      title: "TEMPERATURA",
+      detail: "Alerta local de demostración; no se publicó en el broker.",
+      severity: "warning",
+    };
+    setAlarms((current) => [alarm, ...current].slice(0, 50));
+    setIsAlarm(true);
+    window.setTimeout(() => setIsAlarm(false), 9000);
+  }, []);
 
   const value = useMemo<TelemetryContextValue>(
     () => ({
       temperature,
       humidity,
+      heaterOn,
+      fanOn,
+      doorOpen,
       servoAngle,
       occupied,
       capacity: CAPACITY,
@@ -135,9 +265,9 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       technician: authenticatedTechnician,
       addLot,
       togglePaused: () => setIsPaused((paused) => !paused),
-      triggerDemoAlarm: () => {},
+      triggerDemoAlarm,
     }),
-    [addLot, alarms, history, humidity, isAlarm, isOnline, isPaused, lots, occupied, servoAngle, temperature]
+    [addLot, alarms, doorOpen, fanOn, heaterOn, history, humidity, isAlarm, isOnline, isPaused, lots, occupied, servoAngle, temperature, triggerDemoAlarm],
   );
 
   return <TelemetryContext.Provider value={value}>{children}</TelemetryContext.Provider>;

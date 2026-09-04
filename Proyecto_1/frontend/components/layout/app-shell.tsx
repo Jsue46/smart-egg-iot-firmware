@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <div id="sidebar-navigation"><Navigation collapsed={effectiveCollapsed} /></div>
         <div className="sidebar-foot">
-          <div className="sidebar-status"><ConnectionIcon size={34} color="var(--sprout)" /><span><strong>Sistema conectado</strong><small>Nodo SE-01 · ahora</small></span></div>
+          <div className="sidebar-status"><ConnectionIcon size={34} color="var(--sprout)" /><span><strong>{isOnline ? "Sistema conectado" : "Sistema desconectado"}</strong><small>Nodo SE-01 · ahora</small></span></div>
           <div className="team-badge"><span>G7</span><div><strong>{technician.name}</strong><small>{technician.id}</small></div></div>
         </div>
       </aside>
@@ -113,7 +113,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <h1>{title}</h1>
           </div>
           <div className="live-chip" aria-label={isOnline ? "Sistema en línea" : "Sistema desconectado"}>
-            <span className="live-dot" /> En línea
+            <span className="live-dot" /> {isOnline ? "En línea" : "Desconectado"}
           </div>
         </header>
         <motion.main

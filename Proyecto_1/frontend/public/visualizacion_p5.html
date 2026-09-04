@@ -126,11 +126,15 @@
       <span class="label">Foco / Fan:</span>
       <span class="value" id="hudActuadores">-- / --</span>
     </div>
+    <div class="row">
+      <span class="label">Rotación:</span>
+      <span class="value" id="hudRotacion">--°</span>
+    </div>
     <div class="badge">NODO SE-01</div>
   </div>
 
   <div id="statusPill">
-    <span class="dot"></span> API en Vivo
+    <span class="dot" id="apiDot"></span><span id="apiLabel">API en Vivo</span>
   </div>
 </div>
 
@@ -139,12 +143,13 @@
 const state = {
   temperatura: 37.5,
   humedad: 58.0,
-  servo_ang: 45,
+  servo_ang: 0,
   espacios_libres: 1,
   huevos_count: 2,
   foco: "OFF",
   fan: "OFF",
-  alarma: false
+  alarma: false,
+  api_online: true
 };
 
 const API_URL = "http://127.0.0.1:5000/datos";
@@ -154,28 +159,34 @@ setInterval(async () => {
     const res = await fetch(API_URL);
     if (res.ok) {
       const data = await res.json();
+      state.api_online = true;
       state.temperatura = parseFloat(data.temperatura) || state.temperatura;
       state.humedad = parseFloat(data.humedad) || state.humedad;
       state.espacios_libres = data.espacios_libres !== undefined ? data.espacios_libres : 1;
       state.huevos_count = Math.max(0, 3 - state.espacios_libres);
       state.foco = data.foco || (state.temperatura < 37.2 ? "ON" : "OFF");
       state.fan = data.fan || (state.temperatura >= 38.0 ? "ON" : "OFF");
+      const restRotation = parseFloat(data.rotacion_grados ?? data.servo_ang);
+      if (Number.isFinite(restRotation)) state.servo_ang = restRotation;
       state.alarma = data.alarma === 1 || data.alarma === true || state.temperatura >= 38.5;
 
-      if (frameCount % 120 === 0) {
-        state.servo_ang = state.servo_ang === 45 ? -45 : 45;
-      }
-
+      actualizarHUD();
+    } else {
+      state.api_online = false;
       actualizarHUD();
     }
   } catch (err) {
-    
+    state.api_online = false;
+    actualizarHUD();
   }
 }, 2000);
 
 function actualizarHUD() {
   document.getElementById('hudActuadores').textContent = state.foco + ' / ' + state.fan;
+  document.getElementById('hudRotacion').textContent = state.servo_ang.toFixed(0) + '°';
   document.getElementById('alarmBanner').style.display = state.alarma ? 'flex' : 'none';
+  document.getElementById('apiLabel').textContent = state.api_online ? 'API en Vivo' : 'API desconectada';
+  document.getElementById('apiDot').style.background = state.api_online ? '#10b981' : '#dc2626';
 }
 
 let particulas = [];
@@ -200,6 +211,84 @@ function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
 }
 
+function drawLamp(cx, cy, s) {
+  push();
+  translate(cx, cy - 165 * s);
+  rectMode(CENTER);
+  stroke(71, 85, 105);
+  strokeWeight(1.5 * s);
+  fill(30, 41, 59);
+  rect(0, -17 * s, 22 * s, 9 * s, 3 * s);
+
+  if (state.foco === "ON") {
+    noStroke();
+    for (let halo = 3; halo >= 1; halo--) {
+      fill(245, 158, 11, 16 + halo * 7);
+      ellipse(0, 0, (30 + halo * 17) * s, (30 + halo * 17) * s);
+    }
+    fill(255, 190, 54, 235 + 20 * sin(frameCount * 5));
+    stroke(255, 216, 106);
+    ellipse(0, 0, 27 * s, 27 * s);
+    noStroke();
+    fill(255, 249, 196, 190);
+    ellipse(-5 * s, -6 * s, 8 * s, 10 * s);
+  } else {
+    fill(51, 65, 85);
+    stroke(71, 85, 105);
+    ellipse(0, 0, 22 * s, 22 * s);
+  }
+  pop();
+}
+
+function drawFan(cx, cy, s) {
+  push();
+  translate(cx + 172 * s, cy - 4 * s);
+  rectMode(CENTER);
+  fill(30, 41, 59);
+  stroke(state.fan === "ON" ? color(56, 189, 248) : color(71, 85, 105));
+  strokeWeight(1.8 * s);
+  rect(0, 0, 30 * s, 70 * s, 8 * s);
+
+  stroke(100, 116, 139, 160);
+  noFill();
+  ellipse(0, 0, 42 * s, 42 * s);
+  push();
+  rotate(state.fan === "ON" ? frameCount * 9 : 0);
+  for (let i = 0; i < 4; i++) {
+    push();
+    rotate(i * 90);
+    fill(state.fan === "ON" ? color(154, 230, 255, 220) : color(66, 82, 103, 220));
+    noStroke();
+    beginShape();
+    vertex(0, -3 * s);
+    bezierVertex(5 * s, -18 * s, 17 * s, -17 * s, 16 * s, -6 * s);
+    bezierVertex(12 * s, 0, 6 * s, 1 * s, 0, 3 * s);
+    endShape(CLOSE);
+    pop();
+  }
+  fill(20, 34, 52);
+  stroke(148, 163, 184);
+  strokeWeight(1.2 * s);
+  ellipse(0, 0, 9 * s, 9 * s);
+  pop();
+  pop();
+}
+
+function drawAirflow(cx, cy, s) {
+  const active = state.fan === "ON";
+  const speed = active ? 1.8 : 0.45;
+  const humidityAlpha = constrain(map(state.humedad, 35, 75, 45, 120), 45, 120);
+  for (let i = 0; i < 5; i++) {
+    const phase = (frameCount * speed + i * 62) % 280;
+    const x = cx - 125 * s + phase * s;
+    const y = cy - 90 * s + i * 43 * s;
+    noFill();
+    stroke(56, 189, 248, active ? humidityAlpha : humidityAlpha * 0.55);
+    strokeWeight((active ? 1.4 : 0.9) * s);
+    arc(x, y, (54 + i * 5) * s, (22 + i * 3) * s, 200, 340);
+  }
+}
+
 function draw() {
   const cx = width / 2;
   const cy = height / 2;
@@ -213,6 +302,11 @@ function draw() {
   fill(248, 247, 242);
   rectMode(CENTER);
   rect(cx, cy, 390 * s, 390 * s, 16 * s);
+
+  noFill();
+  stroke(255, 255, 255, 180);
+  strokeWeight(1 * s);
+  rect(cx, cy, 376 * s, 376 * s, 13 * s);
 
   const factorHumedad = map(state.humedad, 30, 85, 0.6, 2.0);
   for (let p of particulas) {
@@ -228,27 +322,9 @@ function draw() {
     circle(px, py, p.tam * s);
   }
 
-  if (state.foco === "ON") {
-    fill(245, 158, 11, 220 + 35 * sin(frameCount * 6));
-    stroke(251, 191, 36);
-    ellipse(cx, cy - 165 * s, 26 * s, 26 * s);
-  } else {
-    fill(51, 65, 85);
-    stroke(71, 85, 105);
-    ellipse(cx, cy - 165 * s, 22 * s, 22 * s);
-  }
-
-  push();
-  translate(cx + 172 * s, cy);
-  fill(30, 41, 59);
-  stroke(state.fan === "ON" ? color(56, 189, 248) : color(71, 85, 105));
-  rect(0, 0, 20 * s, 54 * s, 4 * s);
-  if (state.fan === "ON") {
-    stroke(56, 189, 248);
-    line(-5 * s, (-16 + (frameCount % 10)) * s, 5 * s, (-8 + (frameCount % 10)) * s);
-    line(-5 * s, (4 + (frameCount % 10)) * s, 5 * s, (12 + (frameCount % 10)) * s);
-  }
-  pop();
+  drawAirflow(cx, cy, s);
+  drawLamp(cx, cy, s);
+  drawFan(cx, cy, s);
 
   push();
   translate(cx, cy);
@@ -258,6 +334,11 @@ function draw() {
   stroke(56, 189, 248);
   strokeWeight(2.5 * s);
   ellipse(0, 0, 240 * s, 240 * s);
+
+  noFill();
+  stroke(125, 211, 252, 135);
+  strokeWeight(1.3 * s);
+  ellipse(0, 0, 218 * s, 218 * s);
 
   fill(15, 23, 42);
   stroke(71, 85, 105);

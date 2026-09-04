@@ -33,6 +33,9 @@ export interface TelemetryPoint {
 export interface TelemetryState {
   temperature: number;
   humidity: number;
+  heaterOn: boolean;
+  fanOn: boolean;
+  doorOpen: boolean;
   servoAngle: number;
   occupied: number;
   capacity: number;

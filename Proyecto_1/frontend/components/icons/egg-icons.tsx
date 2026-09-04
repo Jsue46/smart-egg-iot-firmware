@@ -167,3 +167,55 @@ export function DownloadIcon({ size = 20, color = "currentColor", ...props }: Eg
     </svg>
   );
 }
+
+export function ExpandIcon({ size = 20, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props} viewBox="0 0 24 24">
+      <path d="M8 4H4v4M16 4h4v4M4 16v4h4M20 16v4h-4" />
+    </svg>
+  );
+}
+
+export function CloseIcon({ size = 20, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props} viewBox="0 0 24 24">
+      <path d="m6 6 12 12M18 6 6 18" />
+    </svg>
+  );
+}
+
+export function RotateLeftIcon({ size = 20, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props} viewBox="0 0 24 24">
+      <path d="M8 6H4v4M4.5 9.5A8 8 0 1 0 7 5.7" />
+      <path d="M4 10V6h4" />
+    </svg>
+  );
+}
+
+export function RotateRightIcon({ size = 20, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props} viewBox="0 0 24 24">
+      <path d="M16 6h4v4M19.5 9.5A8 8 0 1 1 17 5.7" />
+      <path d="M20 10V6h-4" />
+    </svg>
+  );
+}
+
+export function ZoomOutIcon({ size = 20, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props} viewBox="0 0 24 24">
+      <circle cx="10.8" cy="10.8" r="6.4" />
+      <path d="M8.1 10.8h5.4M15.5 15.5 20 20" />
+    </svg>
+  );
+}
+
+export function ZoomInIcon({ size = 20, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props} viewBox="0 0 24 24">
+      <circle cx="10.8" cy="10.8" r="6.4" />
+      <path d="M8.1 10.8h5.4M10.8 8.1v5.4M15.5 15.5 20 20" />
+    </svg>
+  );
+}

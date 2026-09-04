@@ -14,7 +14,7 @@ Para este **Proyecto 1**, la solución evoluciona desde un sistema aislado hacia
 El proyecto mantiene la lógica de hardware y de negocio establecida en la práctica inicial, expandiendo sus capacidades a través de los siguientes ejes de continuidad:
 
 * **Capa de Adquisición Física (Microcontrolador & Serial):**
-  Se preserva la integración con el microcontrolador físico mediante comunicación serial UART. El backend continúa procesando las tramas JSON estructuradas enviadas desde el hardware, garantizando resiliencia operativa mediante hilos daemon de reconexión automática e inyección de datos de contingencia en caso de desconexión física. Como ampliación del proyecto, se incorpora el registro físico de acceso a cabina mediante switch/sensor para el control de operadores.
+  Se preserva la integración con el microcontrolador físico mediante comunicación serial UART. El backend continúa procesando las tramas JSON estructuradas enviadas desde el hardware, garantizando resiliencia operativa mediante un hilo daemon que reintenta la conexión automáticamente ante una desconexión física. El simulador queda desactivado por defecto y solo se habilita explícitamente para pruebas locales. Como ampliación del proyecto, se incorpora el registro físico de acceso a cabina mediante switch/sensor para el control de operadores.
 
 * **Núcleo del Backend (Python & Flask):**
   La API REST conserva y estandariza los contratos de datos originales (`/datos`, `/historial`, `/huevos`, `/alarmas`, `/reporte`), ampliándose funcionalmente como un **nodo publicador MQTT**. Cada lectura serial capturada se procesa hacia la base de datos relacional y se despacha de forma asíncrona hacia los tópicos correspondientes del broker.
@@ -61,7 +61,7 @@ La arquitectura de **SmartEgg IoT** desacopla la adquisición de señales físic
   * **Descripción:** Comunicación cliente-servidor sincrónica bajo demanda. El frontend consume los contratos de datos expuestos por la API REST (`GET /datos`, `GET /historial`, `GET /huevos`, `POST /huevo`, `GET /reporte`). A través de este canal, la interfaz alimenta periódicamente las tarjetas analíticas de Chart.js y proporciona las lecturas de estado al lienzo interactivo de p5.js.
 
 * **5. Backend REST/API $\longrightarrow$ MQTT Broker (`Publisher`):**
-  * **Protocolo / Interfaz:** Protocolo MQTT (v3.1.1 / v5.0) sobre TCP (puerto estándar 1883).
+  * **Protocolo / Interfaz:** Protocolo MQTT 3.1.1 sobre TCP (puerto estándar 1883).
   * **Descripción:** El backend opera como un cliente publicador (*Publisher*). Cada vez que valida una nueva muestra del puerto serial o detecta condiciones de riesgo térmico/humedad, publica la información en tópicos jerárquicos estructurados (por ejemplo, `smartegg/{id}/sensores/temperatura` y `smartegg/{id}/alarmas/critica`). En las alertas críticas se configura QoS 1 y mensajes retenidos (*retained*), garantizando la entrega confiable y el estado Last Will and Testament (LWT) para supervisión de conectividad.
 
 * **6. MQTT Broker $\longrightarrow$ Frontend Web (`WebSockets` / Tiempo Real):**
