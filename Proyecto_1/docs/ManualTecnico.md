@@ -82,7 +82,7 @@ La arquitectura de **SmartEgg IoT** desacopla la adquisición de señales físic
 
 ## 4. Modelo entidad-relación de la base de datos.
 
-![Diagrama ER SmartEgg](imagenes/Diagrama%20ER.png)
+![Diagrama ER SmartEgg](imagenes/DiagramaER.png)
 
 Diagrama interactivo (dbdiagram.io): https://dbdiagram.io/d/6a9e6fc850ad2c46dc5a2298
 
@@ -115,8 +115,63 @@ Diagrama interactivo (dbdiagram.io): https://dbdiagram.io/d/6a9e6fc850ad2c46dc5a
 ## 8. Documento comparativo HTTP vs. MQTT 
 
 
-## 9. Instrucciones y evidencia de la orquestación con Docker (docker-compose y capturas de los contenedores en ejecución).
+## 9. Instrucciones y evidencia de la orquestación con Docker.
 
+### 9.1 Requisitos previos
+- Docker Desktop instalado y en ejecución.
+- Archivo `.env` creado a partir de `.env.example` (`cp .env.example .env`).
+
+### 9.2 Comandos de despliegue
+
+```bash
+# 1. Copiar variables de entorno
+cp .env.example .env
+
+# 2. Levantar todos los servicios (primera vez, construye las imágenes)
+docker compose up -d --build
+
+# 3. Verificar que los 5 servicios estén arriba
+docker compose ps
+
+# 4. Revisar que la base de datos inicializó el schema correctamente
+docker compose logs postgres
+```
+
+### 9.3 Servicios y accesos
+
+| Servicio | Contenedor | Puerto | URL/Acceso |
+|---|---|---|---|
+| Base de datos | postgres-1 | 5432 | `postgresql://smartegg:***@localhost:5432/smartegg` |
+| Broker MQTT | mosquitto-1 | 1883 / 9001 | `mqtt://localhost:1883`, WebSocket `ws://localhost:9001` |
+| Backend API | backend-1 | 5000 | http://localhost:5000 |
+| Grafana | grafana-1 | 3000 | http://localhost:3000 |
+| Frontend | frontend-1 | 3001 | http://localhost:3001 |
+
+### 9.4 Evidencia de funcionamiento
+
+**Los 5 servicios corriendo (`docker compose ps`):**
+
+![Docker compose ps](imagenes/DockerComposePS.png)
+
+**Inicialización del schema en PostgreSQL (`docker compose logs postgres`):**
+
+![Logs de postgres](imagenes/LogsPostgres.png)
+
+Se observa la creación de las 6 tablas del modelo, los 4 índices y los registros semilla (nodo `SE-01` y los operadores 1 y 2), sin errores.
+
+### 9.5 Prueba de persistencia de datos
+
+Se validó que los datos sobreviven a un reinicio de los contenedores:
+
+```bash
+docker compose down      # elimina contenedores, conserva el volumen
+docker compose up -d     # vuelve a levantar todo
+docker exec -it smartegg-postgres-1 psql -U smartegg -d smartegg -c "SELECT * FROM nodos; SELECT * FROM operadores;"
+```
+
+![Prueba de persistencia](imagenes/PersistenciaTest.png)
+
+El campo `created_at` de los registros coincide con el timestamp de la inicialización original, confirmando que el volumen `postgres_data` conserva la información entre reinicios.
 
 
 ## 10. Capturas de GitHub evidenciando los commits del equipo.
