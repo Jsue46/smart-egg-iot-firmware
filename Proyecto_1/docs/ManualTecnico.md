@@ -82,7 +82,7 @@ La arquitectura de **SmartEgg IoT** desacopla la adquisición de señales físic
 
 ## 4. Modelo entidad-relación de la base de datos.
 
-![Diagrama ER SmartEgg](imagenes/Diagrama_ER.png)
+![Diagrama ER SmartEgg](imagenes/Diagrama%20ER.png)
 
 Diagrama interactivo (dbdiagram.io): https://dbdiagram.io/d/6a9e6fc850ad2c46dc5a2298
 
