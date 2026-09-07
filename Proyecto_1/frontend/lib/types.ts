@@ -16,6 +16,7 @@ export interface Alarm {
   title: string;
   detail: string;
   severity: "info" | "warning" | "critical";
+  active?: boolean;
 }
 
 export interface Technician {

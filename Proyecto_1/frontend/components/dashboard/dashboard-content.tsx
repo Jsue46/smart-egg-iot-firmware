@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { AlarmIcon, CapacityIcon, ConnectionIcon, HumidityIcon, PauseIcon, PlayIcon, RotationIcon, TemperatureIcon } from "@/components/icons/egg-icons";
+import { CapacityIcon, ConnectionIcon, HumidityIcon, PauseIcon, PlayIcon, RotationIcon, TemperatureIcon } from "@/components/icons/egg-icons";
 import { SensorCard } from "@/components/sensores/sensor-card";
 import { useToast } from "@/components/ui/toast-provider";
 import { useSimulatedTelemetry } from "@/hooks/use-simulated-telemetry";
@@ -21,10 +21,6 @@ export function DashboardContent() {
       message: telemetry.isPaused ? "Las lecturas vuelven a actualizarse cada 2 segundos." : "Los valores permanecerán fijos hasta que reanudes los datos.",
     });
   };
-  const showDemoAlarm = () => {
-    telemetry.triggerDemoAlarm();
-    showToast({ tone: "warning", title: "Alerta de demostración", message: "Se simuló una temperatura elevada durante nueve segundos." });
-  };
 
   return (
     <div className="dashboard-stack">
@@ -34,7 +30,6 @@ export function DashboardContent() {
           <button className="button secondary compact pause-action" type="button" onClick={toggleTelemetry} aria-pressed={telemetry.isPaused}>
             {telemetry.isPaused ? <PlayIcon /> : <PauseIcon />}{telemetry.isPaused ? "Reanudar" : "Pausar datos"}
           </button>
-          <button className="button ghost compact alert-action" type="button" onClick={showDemoAlarm}><AlarmIcon size={23} />Probar alerta</button>
         </div>
       </div>
       <div className="section-heading"><div><p className="eyebrow">Lecturas del nodo SE-01</p><h2>Sensores en vivo</h2></div><span className="updated-label">Actualiza cada 2 s</span></div>

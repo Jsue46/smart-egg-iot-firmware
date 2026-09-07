@@ -11,6 +11,8 @@ import {
 } from "react";
 import type { MqttClient } from "mqtt";
 import { authenticatedTechnician } from "@/lib/mock-data";
+import { ROLE_LABELS } from "@/lib/auth";
+import { useAuth } from "@/components/auth/auth-provider";
 import { API_BASE_URL, MQTT_WS_URL, NODE_ID } from "@/lib/config";
 import type { Alarm, Lot, TelemetryPoint, TelemetryState } from "@/lib/types";
 
@@ -51,6 +53,7 @@ function mqttAlarm(payload: any): Alarm {
     title: payload.tipo ?? "SISTEMA",
     detail: payload.mensaje ?? payload.descripcion ?? "Alarma reportada por el nodo",
     severity,
+    active: payload.activa === true || payload.activa === 1 || payload.active === true,
   };
 }
 
@@ -68,6 +71,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
   const [isPaused, setIsPaused] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
   const [isAlarm, setIsAlarm] = useState(false);
+  const { user } = useAuth();
 
   const fetchData = useCallback(async () => {
     if (isPaused) return;
@@ -216,7 +220,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({
           lote: `LT-${Date.now()}`,
           etiqueta: input.label,
-          tecnico: authenticatedTechnician.name,
+          tecnico: user?.name ?? authenticatedTechnician.name,
           entryDate: input.entryDate,
           quantity: input.quantity,
           requiredTemperature: input.requiredTemperature,
@@ -230,7 +234,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       await fetchData();
       return { ...input, id: `LT-${result.id ?? Date.now()}`, status: "incubando", progress: 1 };
     },
-    [fetchData],
+    [fetchData, user],
   );
 
   const triggerDemoAlarm = useCallback(() => {
@@ -262,12 +266,13 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       history,
       lots,
       alarms,
-      technician: authenticatedTechnician,
+      technician:
+        user ? { name: user.name, id: user.badge, role: ROLE_LABELS[user.role] } : authenticatedTechnician,
       addLot,
       togglePaused: () => setIsPaused((paused) => !paused),
       triggerDemoAlarm,
     }),
-    [addLot, alarms, doorOpen, fanOn, heaterOn, history, humidity, isAlarm, isOnline, isPaused, lots, occupied, servoAngle, temperature, triggerDemoAlarm],
+    [addLot, alarms, doorOpen, fanOn, heaterOn, history, humidity, isAlarm, isOnline, isPaused, lots, occupied, servoAngle, temperature, triggerDemoAlarm, user],
   );
 
   return <TelemetryContext.Provider value={value}>{children}</TelemetryContext.Provider>;

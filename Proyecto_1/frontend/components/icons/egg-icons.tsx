@@ -219,3 +219,42 @@ export function ZoomInIcon({ size = 20, color = "currentColor", ...props }: EggI
     </svg>
   );
 }
+
+export function UserIcon({ size = 20, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props} viewBox="0 0 48 48">
+      <EggShell />
+      <circle cx="24" cy="19.5" r="5.5" />
+      <path d="M15.5 34c1.7-4.6 5-6.9 8.5-6.9s6.8 2.3 8.5 6.9" />
+    </svg>
+  );
+}
+
+export function LogoutIcon({ size = 20, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props} viewBox="0 0 24 24">
+      <path d="M10 5H5v14h5M14 8l4 4-4 4M9 12h9" />
+    </svg>
+  );
+}
+
+export function DoorIcon({ size = 48, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props}>
+      <EggShell />
+      <path d="M14 42V16c0-2.8 2.2-5 5-5h10c2.8 0 5 2.2 5 5v26" />
+      <path d="M14 42h20M21.5 42V27h5v15" />
+      <circle cx="29.5" cy="23" r="1.5" fill={color} stroke="none" />
+    </svg>
+  );
+}
+
+export function AdminIcon({ size = 48, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props}>
+      <EggShell />
+      <path d="M18 21v11.5c0 0 6 4.2 6 4.2s6-4.2 6-4.2V21" />
+      <path d="M20.5 26l2.6 2.6 4.4-4.6" strokeWidth="2" />
+    </svg>
+  );
+}

@@ -5,20 +5,37 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { MotionConfig, motion } from "motion/react";
 import { useSimulatedTelemetry } from "@/hooks/use-simulated-telemetry";
+import { useAuth } from "@/components/auth/auth-provider";
+import { AlarmBanner, AlarmCenter } from "@/components/alarmas/alarm-center";
+import { ROLE_LABELS, type Role } from "@/lib/auth";
 import {
+  AdminIcon,
   ConnectionIcon,
   DashboardIcon,
+  DoorIcon,
+  LogoutIcon,
   LotIcon,
   MenuIcon,
   PlusEggIcon,
   ReportIcon,
+  UserIcon,
 } from "@/components/icons/egg-icons";
 
-const navigation = [
-  { href: "/dashboard", label: "Panel", icon: DashboardIcon },
-  { href: "/lotes", label: "Lotes", icon: LotIcon },
-  { href: "/reportes", label: "Reportes", icon: ReportIcon },
-  { href: "/lotes/nuevo", label: "Registrar", icon: PlusEggIcon },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof DashboardIcon;
+  roles: Role[];
+}
+
+const navigation: NavItem[] = [
+  { href: "/dashboard", label: "Panel", icon: DashboardIcon, roles: ["administrador", "operador1", "operador2"] },
+  { href: "/lotes", label: "Lotes", icon: LotIcon, roles: ["administrador", "operador1", "operador2"] },
+  { href: "/reportes", label: "Reportes", icon: ReportIcon, roles: ["administrador", "operador1", "operador2"] },
+  { href: "/puerta", label: "Puerta", icon: DoorIcon, roles: ["operador1", "operador2"] },
+  { href: "/lotes/nuevo", label: "Registrar", icon: PlusEggIcon, roles: ["administrador", "operador1", "operador2"] },
+  { href: "/perfil", label: "Perfil", icon: UserIcon, roles: ["administrador", "operador1", "operador2"] },
+  { href: "/admin", label: "Administración", icon: AdminIcon, roles: ["administrador"] },
 ];
 
 const SIDEBAR_STORAGE_KEY = "smartegg-sidebar-collapsed";
@@ -32,11 +49,11 @@ function Brand() {
   );
 }
 
-function Navigation({ mobile = false, collapsed = false }: { mobile?: boolean; collapsed?: boolean }) {
+function Navigation({ mobile = false, collapsed = false, items }: { mobile?: boolean; collapsed?: boolean; items: NavItem[] }) {
   const pathname = usePathname();
   return (
     <nav className={mobile ? "mobile-nav" : "sidebar-nav"} aria-label="Navegación principal">
-      {navigation.map(({ href, label, icon: Icon }) => {
+      {items.map(({ href, label, icon: Icon }) => {
         const active = pathname === href;
         return (
           <Link
@@ -56,12 +73,25 @@ function Navigation({ mobile = false, collapsed = false }: { mobile?: boolean; c
   );
 }
 
+function PageTitle({ pathname }: { pathname: string }) {
+  const titles: Record<string, string> = {
+    "/dashboard": "Panel de incubación",
+    "/reportes": "Reportes",
+    "/lotes/nuevo": "Registrar lote",
+    "/lotes": "Lotes",
+    "/puerta": "Control de puerta",
+    "/perfil": "Mi perfil",
+    "/admin": "Administración",
+  };
+  return <>{titles[pathname] ?? "SmartEgg"}</>;
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { isOnline, technician } = useSimulatedTelemetry();
+  const { user, logout } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [narrowRail, setNarrowRail] = useState(false);
-  const title = pathname === "/dashboard" ? "Panel de incubación" : pathname === "/reportes" ? "Reportes" : pathname === "/lotes/nuevo" ? "Registrar lote" : "Lotes";
 
   useEffect(() => {
     setSidebarCollapsed(window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true");
@@ -72,6 +102,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => mediaQuery.removeEventListener("change", updateRail);
   }, []);
 
+  if (pathname === "/login") return <>{children}</>;
+
   const effectiveCollapsed = sidebarCollapsed || narrowRail;
   const toggleSidebar = () => {
     setSidebarCollapsed((current) => {
@@ -80,6 +112,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       return next;
     });
   };
+
+  const visibleNavigation = user ? navigation.filter((item) => item.roles.includes(user.role)) : navigation;
+  const identityName = user?.name ?? technician.name;
+  const identityBadge = user?.badge ?? technician.id;
 
   return (
     <MotionConfig reducedMotion="user">
@@ -99,10 +135,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             <MenuIcon size={27} />
           </button>
         </div>
-        <div id="sidebar-navigation"><Navigation collapsed={effectiveCollapsed} /></div>
+        <div id="sidebar-navigation"><Navigation collapsed={effectiveCollapsed} items={visibleNavigation} /></div>
         <div className="sidebar-foot">
           <div className="sidebar-status"><ConnectionIcon size={34} color="var(--sprout)" /><span><strong>{isOnline ? "Sistema conectado" : "Sistema desconectado"}</strong><small>Nodo SE-01 · ahora</small></span></div>
-          <div className="team-badge"><span>G7</span><div><strong>{technician.name}</strong><small>{technician.id}</small></div></div>
+          <div className="team-badge"><span>{user ? "OP" : "G7"}</span><div><strong>{identityName}</strong><small>{identityBadge}</small></div></div>
+          <button className="logout-link" type="button" onClick={logout} aria-label="Cerrar sesión">
+            <strong>Cerrar sesión</strong>
+            <LogoutIcon size={20} />
+          </button>
         </div>
       </aside>
       <div className="app-main">
@@ -110,12 +150,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="mobile-brand"><Brand /></div>
           <div>
             <p className="eyebrow">Incubadora principal · Zona 1</p>
-            <h1>{title}</h1>
+            <h1><PageTitle pathname={pathname} /></h1>
           </div>
-          <div className="live-chip" aria-label={isOnline ? "Sistema en línea" : "Sistema desconectado"}>
-            <span className="live-dot" /> {isOnline ? "En línea" : "Desconectado"}
+          <div className="topbar-actions">
+            <AlarmCenter />
+            <div className="live-chip" aria-label={isOnline ? "Sistema en línea" : "Sistema desconectado"}>
+              <span className="live-dot" /> {isOnline ? "En línea" : "Desconectado"}
+              {user ? <small style={{ marginLeft: 8, color: "var(--muted)", fontFamily: "var(--font-mono), monospace" }}>{ROLE_LABELS[user.role]}</small> : null}
+            </div>
           </div>
         </header>
+        <AlarmBanner />
         <motion.main
           id="main-content"
           tabIndex={-1}
@@ -128,7 +173,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {children}
         </motion.main>
       </div>
-      <Navigation mobile />
+      <Navigation mobile items={visibleNavigation} />
     </div>
     </MotionConfig>
   );

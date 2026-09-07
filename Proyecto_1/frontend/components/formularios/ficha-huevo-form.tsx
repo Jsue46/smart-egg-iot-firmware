@@ -37,7 +37,7 @@ function FichaCard({ lot }: { lot: Lot }) {
         <div><dt>Cantidad registrada</dt><dd>{lot.quantity} {lot.quantity === 1 ? "huevo" : "huevos"}</dd></div>
         <div><dt>Temperatura requerida</dt><dd><TemperatureIcon size={23} />{lot.requiredTemperature.toFixed(1)} °C</dd></div>
       </dl>
-      <div className="ficha-footer"><span /><p>Registro guardado en PostgreSQL</p></div>
+      <div className="ficha-footer"><span /><p>Ficha registrada correctamente</p></div>
     </motion.aside>
   );
 }

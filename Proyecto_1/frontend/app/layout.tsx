@@ -3,6 +3,7 @@ import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";
 import { ToastProvider } from "@/components/ui/toast-provider";
+import { AuthProvider } from "@/components/auth/auth-provider";
 import { TelemetryProvider } from "@/hooks/use-simulated-telemetry";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-ui", weight: ["400", "500"] });
@@ -20,7 +21,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="es" className={`${inter.variable} ${fraunces.variable} ${mono.variable}`}>
       <body>
-        <ToastProvider><TelemetryProvider><AppShell>{children}</AppShell></TelemetryProvider></ToastProvider>
+        <AuthProvider><ToastProvider><TelemetryProvider><AppShell>{children}</AppShell></TelemetryProvider></ToastProvider></AuthProvider>
       </body>
     </html>
   );
