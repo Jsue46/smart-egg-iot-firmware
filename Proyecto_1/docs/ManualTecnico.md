@@ -82,6 +82,26 @@ La arquitectura de **SmartEgg IoT** desacopla la adquisición de señales físic
 
 ## 4. Modelo entidad-relación de la base de datos.
 
+![Diagrama ER SmartEgg](imagenes/Diagrama_ER.png)
+
+Diagrama interactivo (dbdiagram.io): https://dbdiagram.io/d/6a9e6fc850ad2c46dc5a2298
+
+### Entidades
+
+| Tabla | Descripción |
+|---|---|
+| `nodos` | Incubadoras registradas en el sistema |
+| `operadores` | Usuarios con acceso a apertura/cierre (Operador 1, Operador 2, Admin) |
+| `lotes` | Fichas de huevos ingresados, asociadas a un nodo y opcionalmente a un operador |
+| `lecturas` | Telemetría histórica: temperatura, humedad, actuadores, rotación |
+| `alarmas` | Eventos críticos con severidad, inicio y resolución |
+| `accesos_puerta` | Registro de apertura/cierre de cabina con cantidad de huevos |
+
+### Relaciones clave
+- Un `nodo` tiene muchos `lotes`, `lecturas`, `alarmas` y `accesos_puerta`.
+- Un `operador` puede estar asociado a varios `lotes` (quien lo ingresó) y varios `accesos_puerta` (quien abrió/cerró).
+- Cada `lectura` y `alarma` puede vincularse opcionalmente a un `lote` (`lote_id` nullable, se conserva el histórico aunque el lote termine).
+
 
 ## 5. API Contracts del backend
 
