@@ -32,8 +32,6 @@ El proyecto mantiene la lógica de hardware y de negocio establecida en la prác
   3. Dashboards avanzados en **Grafana** conectados al broker MQTT y a la base de datos para la supervisión y auditoría de la infraestructura operativa.
 
 ## 2. Diagrama de arquitectura general
-## 2. Arquitectura General del Sistema
-
 ### 2.1 Diagrama de Arquitectura
 
 ![diagrama arquitectura](<imagenes/Diagrama de arquitectura genera.png>)
@@ -76,8 +74,27 @@ La arquitectura de **SmartEgg IoT** desacopla la adquisición de señales físic
   * **Protocolo / Interfaz:** Driver nativo SQL (PostgreSQL/MySQL) sobre TCP.
   * **Descripción:** Grafana ejecuta consultas directas de solo lectura contra el motor de base de datos relacional. Mediante agregaciones SQL (`AVG`, `MAX`, `MIN`), nutre tableros de analítica avanzada que muestran tendencias históricas semanales, duraciones acumuladas de alarmas térmicas y registros de acceso de los operadores a lo largo de los lotes de incubación.
 
+### 2.3 Flujo Integrado de Datos Extremo a Extremo
+1. El microcontrolador envía periódicamente una línea JSON estructurada por el bus UART a 9600 baudios.
+2. Flask valida la lectura, la registra en PostgreSQL y gestiona la apertura o cierre de intervalos de alarma térmica.
+3. El publicador MQTT envía telemetría, estado de actuadores y alarmas; mantiene `status=online` y configura Last Will and Testament (LWT) como `offline`.
+4. Grafana utiliza MQTT para el dashboard de operación en vivo y PostgreSQL para la analítica histórica.
+5. Next.js consume la API REST para lotes e histórico, y se conecta mediante MQTT.js sobre WebSockets para recibir alarmas y estado sin recargar la página.
 
-## 3. Documentación de la jerarquía de topics MQTT (nombre, publicador, suscriptores, formato del payload, QoS).
+> **Estandarización temporal:** Todos los timestamps se publican y almacenan en formato UTC / ISO 8601 para garantizar consistencia. Ambos dashboards en Grafana operan con `timezone: browser`, adaptando automáticamente las series temporales al huso horario del operador.
+
+## 3. Documentación de la Jerarquía de Topics MQTT
+
+| Topic | QoS | Retained | Publicador | Suscriptores | Contenido / Payload |
+|---|:---:|:---:|---|---|---|
+| `smartegg/SE-01/sensores/temperatura` | 0 | No | Backend Flask | Grafana, Frontend | `{valor, unidad, timestamp}` |
+| `smartegg/SE-01/sensores/humedad` | 0 | No | Backend Flask | Grafana, Frontend | `{valor, unidad, timestamp}` |
+| `smartegg/SE-01/actuadores/estado` | 1 | Sí | Backend Flask | Grafana, Frontend | `{foco, ventilador, rotacion_grados}` |
+| `smartegg/SE-01/alarmas/critica` | 1 | Sí | Backend Flask | Grafana, Frontend | `{activa, tipo, severidad, inicio_at, resolucion_at}` |
+| `smartegg/SE-01/status` | 1 | Sí | Backend Flask (LWT Broker) | Grafana, Frontend | `{estado, valor}`; `offline`/`valor=0` es el LWT |
+| `smartegg/SE-01/puerta/evento` | 1 | No | Backend Flask | Grafana, Frontend | `{id, accion, operador_id, cantidad_huevos, timestamp}` |
+
+* **Detalles de configuración:** Broker Mosquitto con listener TCP en puerto 1883 y listener WebSocket en puerto 9001. Documentación completa de pruebas y esquemas en `infra/mqtt/README.md`.
 
 
 ## 4. Modelo entidad-relación de la base de datos.
@@ -103,13 +120,100 @@ Diagrama interactivo (dbdiagram.io): https://dbdiagram.io/d/6a9e6fc850ad2c46dc5a
 - Cada `lectura` y `alarma` puede vincularse opcionalmente a un `lote` (`lote_id` nullable, se conserva el histórico aunque el lote termine).
 
 
-## 5. API Contracts del backend
+## 5. API Contracts del Backend
 
+El contrato OpenAPI completo del sistema se encuentra definido en [`docs/openapi.yaml`](docs/openapi.yaml).
 
-## 6. Capturas de los dashboards de Grafana 
+### 5.1 Catálogo de Endpoints Principales
+* `GET /health`: Comprobación de estado del servicio y conectividad con la base de datos.
+* `GET /datos`: Lectura de telemetría instantánea y actuadores en vivo.
+* `GET /historial`: Muestras históricas continuas para gráficas y analítica.
+* `POST /huevo` / `GET /huevos`: Registro y consulta de estados de huevos por posición.
+* `GET /alarmas`: Registro de eventos críticos e intervalos de superación de umbral.
+* `GET /operadores`: Listado de usuarios autorizados (Operador 1, Operador 2, Administrador).
+* `POST /puerta` / `GET /accesos-puerta`: Bitácora física de eventos de apertura y cierre de cabina.
+* `GET /reporte`: Generación y descarga del informe consolidado en PDF.
 
+## 6. Capturas de los Dashboards de Grafana
+
+Los dashboards se provisionan automáticamente mediante archivos de configuración en el despliegue:
+
+* **SmartEgg - Monitoreo MQTT en Tiempo Real:** Panel de baja latencia conectado al datasource MQTT streaming. Despliega temperatura, humedad, estado de foco/ventilador, rotación del servomotor, KPI de alarmas activas, estado de conexión (LWT) y el último evento registrado en la puerta.
+![monitoreo](imagenes/monitoreo-MQTT.png)
+
+* **SmartEgg - Analítica Histórica:** Panel de agregación conectado mediante SQL directo a PostgreSQL. Despliega tendencias de temperatura/humedad por lote, métricas de ocupación, valores mínimos/máximos/promedio, duración acumulada de alarmas y accesos de operadores.
+![analitica-historica](imagenes/analitica-historica1.png)
+![analitica-historica](imagenes/analitica-historica2.png)
 
 ## 7. Explicación de los frameworks/librerías y enlace al video demostrativo
+
+### 7.1 Visualización interactiva con p5.js
+
+La visualización interactiva principal del dashboard está construida con **p5.js 1.9.0**. p5.js es una biblioteca JavaScript orientada a la creación de gráficos interactivos y animaciones mediante un elemento `canvas` HTML. Se eligió para representar de manera sencilla y visual el estado de la incubadora sin depender de un modelo 3D complejo.
+
+La visualización se encuentra en `frontend/public/visualizacion_p5.html` y se integra en el dashboard mediante un `iframe` desde el componente `IncubatorVisualizer`. Al estar dentro de la carpeta `public`, el archivo se accede desde la ruta `/visualizacion_p5.html`.
+
+El programa utiliza las funciones principales de p5.js:
+
+* `setup()` crea el lienzo, configura el modo angular y prepara las partículas que representan el vapor o la humedad.
+* `draw()` se ejecuta continuamente para redibujar la escena y actualizar el movimiento de las partículas, el foco, el ventilador, la bandeja y los huevos.
+* `createCanvas()` genera el área de renderizado adaptada al tamaño del `iframe`.
+* Las transformaciones `translate()` y `rotate()` permiten mostrar la rotación de la bandeja según el ángulo recibido del servomotor.
+
+La escena representa los siguientes elementos del sistema SmartEgg:
+
+* El color ambiental cambia según la temperatura.
+* Las partículas animadas reaccionan al valor de humedad.
+* El foco se muestra encendido o apagado según el estado del actuador.
+* El ventilador extractor cambia su apariencia cuando está activo.
+* La bandeja circular gira de acuerdo con `rotacion_grados` o `servo_ang`.
+* Los huevos ocupan las posiciones correspondientes a la cantidad calculada a partir de `espacios_libres`.
+* El marco y la banda de alerta se activan cuando la API reporta una alarma o la temperatura supera el umbral crítico.
+
+Cada dos segundos, el archivo ejecuta una petición `fetch` al endpoint `GET /datos` del backend Flask. La respuesta actualiza temperatura, humedad, espacios libres, estados de los actuadores, rotación y alarma. Por lo tanto, la escena no depende únicamente de valores estáticos: consume la telemetría real expuesta por la API REST.
+
+### 7.2 Uso de Three.js
+
+El proyecto incluye las dependencias `three`, `@react-three/fiber` y `@react-three/drei`, que permiten construir escenas 3D con Three.js dentro de React. Estas herramientas son adecuadas para modelos tridimensionales, cámaras, luces, materiales y controles de navegación.
+
+Sin embargo, la visualización que se muestra actualmente en el dashboard para representar la incubadora es la implementación 2D realizada con p5.js. Three.js no es la biblioteca que renderiza esa visualización activa; sus componentes se conservan como soporte para posibles escenas 3D futuras o para pruebas del prototipo. Esta distinción evita documentar como funcional una visualización que no corresponde al panel actualmente desplegado.
+
+### 7.3 Gráficos analíticos con Chart.js
+
+Para los gráficos históricos se utiliza **Chart.js 4.5.1**, integrado en React mediante **react-chartjs-2**. Chart.js se seleccionó porque ofrece una API clara para construir gráficos de líneas y barras, soporta actualización de datos, tooltips, leyendas, escalas y diseño responsive, y se integra directamente con el ciclo de renderizado de los componentes React.
+
+El componente `AnalyticsCharts` consulta el endpoint `GET /historial?limit=100` mediante `fetch`. La respuesta se almacena en el estado del componente y se actualiza automáticamente cada cuatro segundos. Para mantener el gráfico legible, se muestran las últimas 15 lecturas en orden cronológico.
+
+Actualmente se presentan dos gráficos:
+
+1. **Historial térmico y de humedad:** gráfico de líneas que muestra temperatura en grados Celsius y humedad relativa en porcentaje. Cada punto corresponde a una lectura almacenada en la base de datos.
+2. **Registro de ocupación:** gráfico de barras que calcula los huevos ocupados mediante `3 - espacios_libres`, respetando la capacidad de tres posiciones de la bandeja.
+
+Chart.js registra los módulos `CategoryScale`, `LinearScale`, `PointElement`, `LineElement`, `BarElement`, `Title`, `Tooltip`, `Legend` y `Filler`. Esto permite trabajar con etiquetas de tiempo, escalas numéricas, puntos, líneas, barras, áreas rellenas, leyendas y ayudas emergentes.
+
+### 7.4 Flujo de datos de las visualizaciones
+
+El flujo implementado es el siguiente:
+
+1. El microcontrolador envía las lecturas al backend mediante comunicación serial.
+2. Flask valida y persiste las lecturas en la base de datos.
+3. El endpoint `GET /datos` entrega el estado actual para la escena p5.js.
+4. El endpoint `GET /historial` entrega las lecturas históricas para Chart.js.
+5. p5.js representa el estado actual en tiempo real, mientras Chart.js presenta la evolución histórica de las variables.
+
+Esta separación permite utilizar cada herramienta según su propósito: p5.js se encarga de la representación interactiva y animada de la incubadora, y Chart.js de la comparación y análisis de las mediciones almacenadas.
+
+### 7.5 Ventajas y consideraciones técnicas
+
+* **p5.js:** facilita la creación de una escena animada personalizada y permite relacionar directamente cada elemento visual con una variable de telemetría.
+* **Chart.js:** reduce el código necesario para crear gráficos profesionales y proporciona escalas, leyendas, tooltips y adaptación responsive.
+* **Three.js:** queda disponible para una futura representación 3D más detallada, pero no es necesario para la visualización p5.js actualmente utilizada.
+* **REST y `fetch`:** mantienen una integración simple entre el frontend y Flask. El sondeo periódico permite refrescar los datos sin recargar la página completa.
+
+### 7.6 Video Demostrativo
+* **Demostración en video (4 min):** [Ver Video Demostrativo de SmartEgg](https://drive.google.com/file/d/154BJDqPCBuRmhvK30u8I7iYwhhcL9cLo/view?usp=sharing)
+* **Plataforma:** Google Drive
+* **Duración:** 4:21 minutos
 
 
 ## 8. Documento comparativo HTTP vs. MQTT 
@@ -136,6 +240,13 @@ docker compose ps
 # 4. Revisar que la base de datos inicializó el schema correctamente
 docker compose logs postgres
 ```
+
+### 9.2.1 Configuración de Modo Simulado vs. Hardware Real
+* **Modo Simulado:** Para probar el circuito completo sin el Arduino conectado, se define `SIMULATE_TELEMETRY=true` en `.env` y se recrea el contenedor:
+  ```powershell
+  docker compose up -d --force-recreate backend
+  Invoke-RestMethod http://localhost:5000/health | ConvertTo-Json
+  ```
 
 ### 9.3 Servicios y accesos
 
@@ -177,4 +288,6 @@ El campo `created_at` de los registros coincide con el timestamp de la inicializ
 ## 10. Capturas de GitHub evidenciando los commits del equipo.
 
 
+
 ## 11. Manual de usuario
+[Manual-Usuario](ManualUsuario.md)
