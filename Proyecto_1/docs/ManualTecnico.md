@@ -351,8 +351,8 @@ El campo `created_at` de los registros coincide con el timestamp de la inicializ
 
 
 ## 10. Capturas de GitHub evidenciando los commits del equipo.
-
-
+![captura-commits](imagenes/commits1.png)  
+![captura-commits](imagenes/commits2.png)  
 
 ## 11. Manual de usuario
 [Manual-Usuario](ManualUsuario.md)
