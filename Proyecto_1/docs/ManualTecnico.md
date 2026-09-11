@@ -350,7 +350,9 @@ docker exec -it smartegg-postgres-1 psql -U smartegg -d smartegg -c "SELECT * FR
 El campo `created_at` de los registros coincide con el timestamp de la inicialización original, confirmando que el volumen `postgres_data` conserva la información entre reinicios.
 
 
-## 10. Capturas de GitHub evidenciando los commits del equipo.
+## 10. Capturas de GitHub evidenciando los commits del equipo.  
+A continuación se presenta la evidencia del trabajo colaborativo del equipo en el repositorio de GitHub, verificando la participación activa y el registro de commits por parte de cada integrante:  
+
 ![captura-commits](imagenes/commits1.png)  
 ![captura-commits](imagenes/commits2.png)  
 
