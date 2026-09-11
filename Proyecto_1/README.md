@@ -53,7 +53,7 @@ Los timestamps se publican y almacenan en UTC/ISO 8601 para que todos los servic
 | `smartegg/SE-01/status` | 1 | Sí | `{estado, valor}`; `offline`/`valor=0` es el LWT |
 | `smartegg/SE-01/puerta/evento` | 1 | No | `{id, accion, operador_id, cantidad_huevos, timestamp}`; evento en vivo |
 
-La configuración del broker, pruebas y payloads completos están en [`infra/mqtt/README.md`](infra/mqtt/README.md) y [`docs/ROL4_MQTT_GRAFANA.md`](docs/ROL4_MQTT_GRAFANA.md).
+La configuración del broker, pruebas y payloads completos están en [`infra/mqtt/README.md`](infra/mqtt/README.md).
 
 ## Grafana
 

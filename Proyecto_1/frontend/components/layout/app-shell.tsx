@@ -158,6 +158,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="live-dot" /> {isOnline ? "En línea" : "Desconectado"}
               {user ? <small style={{ marginLeft: 8, color: "var(--muted)", fontFamily: "var(--font-mono), monospace" }}>{ROLE_LABELS[user.role]}</small> : null}
             </div>
+            <button className="mobile-logout" type="button" onClick={logout} aria-label="Cerrar sesión" title="Cerrar sesión">
+              <LogoutIcon size={19} />
+            </button>
           </div>
         </header>
         <AlarmBanner />

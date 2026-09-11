@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { API_BASE_URL } from "@/lib/config";
-import { AdminIcon, AlarmIcon, DoorIcon, LotIcon, RotateLeftIcon, UserIcon } from "@/components/icons/egg-icons";
+import { AdminIcon, AlarmIcon, DoorIcon, GrafanaIcon, LotIcon, RotateLeftIcon, UserIcon } from "@/components/icons/egg-icons";
 
 interface OperatorRow {
   id: number;
@@ -46,6 +46,8 @@ function durationText(start?: string, end?: string): string | null {
   return `${minutes} min ${seconds % 60} s`;
 }
 
+const ALARMS_PER_PAGE = 5;
+
 export function AdminConsole() {
   const { user } = useAuth();
   const [operators, setOperators] = useState<OperatorRow[]>([]);
@@ -53,9 +55,11 @@ export function AdminConsole() {
   const [alarms, setAlarms] = useState<AlarmRow[]>([]);
   const [doors, setDoors] = useState<DoorRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [alarmPage, setAlarmPage] = useState(1);
 
   const load = useCallback(async () => {
     setRefreshing(true);
+    setAlarmPage(1);
     try {
       const [opRes, lotRes, alarmRes, doorRes] = await Promise.all([
         fetch(`${API_BASE_URL}/operadores`, { cache: "no-store" }),
@@ -98,6 +102,9 @@ export function AdminConsole() {
   const incubating = lots.filter((lot) => lot.status !== "completo").length;
   const activeAlarms = alarms.filter((alarm) => alarm.activa).length;
   const doorOpens = doors.filter((door) => door.accion === "ABRIR").length;
+  const alarmPageCount = Math.max(1, Math.ceil(alarms.length / ALARMS_PER_PAGE));
+  const currentAlarmPage = Math.min(alarmPage, alarmPageCount);
+  const visibleAlarms = alarms.slice((currentAlarmPage - 1) * ALARMS_PER_PAGE, currentAlarmPage * ALARMS_PER_PAGE);
 
   const kpis = [
     { label: "Lotes registrados", value: `${lots.length}`, detail: `${incubating} en incubación`, icon: LotIcon, color: "var(--sprout)" },
@@ -159,14 +166,15 @@ export function AdminConsole() {
         </div>
 
         <div style={{ marginTop: 22 }}>
-          <div className="form-heading" style={{ padding: 0, marginBottom: 12 }}>
+          <div className="admin-section-heading">
             <div><p className="eyebrow">Historial</p><h2 style={{ fontSize: 20 }}>Últimas alarmas</h2></div>
+            {alarms.length > 0 ? <span className="admin-count-chip">{alarms.length} registradas</span> : null}
           </div>
-          <div style={{ display: "grid", gap: 8 }}>
+          <div className="admin-alarm-list">
             {alarms.length === 0 ? (
               <p style={{ color: "var(--muted)", fontSize: 12, margin: 0 }}>Sin alarmas registradas en el sistema.</p>
             ) : (
-              alarms.slice(0, 12).map((alarm) => (
+              visibleAlarms.map((alarm) => (
                 <div key={alarm.id} className={`alarm-item ${alarm.severidad === "warning" ? "warning" : "critical"}`}>
                   <div className="alarm-item-head">
                     <span className={alarm.activa ? "alarm-status activa" : "alarm-status resuelta"}>{alarm.activa ? "Activa" : "Resuelta"}</span>
@@ -179,10 +187,33 @@ export function AdminConsole() {
               ))
             )}
           </div>
+          {alarms.length > ALARMS_PER_PAGE ? (
+            <div className="admin-pagination" aria-label="Paginación de últimas alarmas">
+              <button
+                type="button"
+                className="button ghost compact"
+                onClick={() => setAlarmPage((page) => Math.max(1, page - 1))}
+                disabled={currentAlarmPage === 1}
+                aria-label="Ver alarmas anteriores"
+              >
+                Anteriores
+              </button>
+              <span aria-live="polite"><strong>{currentAlarmPage}</strong> / {alarmPageCount}<small>5 por página</small></span>
+              <button
+                type="button"
+                className="button ghost compact"
+                onClick={() => setAlarmPage((page) => Math.min(alarmPageCount, page + 1))}
+                disabled={currentAlarmPage === alarmPageCount}
+                aria-label="Ver alarmas siguientes"
+              >
+                Siguientes
+              </button>
+            </div>
+          ) : null}
         </div>
       </section>
 
-      <div className="registration-side" style={{ display: "grid", gap: 16 }}>
+      <div className="registration-side admin-side" style={{ display: "grid", gap: 16 }}>
         <section style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 22, boxShadow: "var(--shadow-soft)", padding: "20px" }}>
           <div className="form-heading" style={{ padding: 0, marginBottom: 12 }}>
             <div><p className="eyebrow">Accesos</p><h2 style={{ fontSize: 20 }}>Todas las aperturas</h2></div>
@@ -204,12 +235,23 @@ export function AdminConsole() {
           )}
         </section>
 
-        <section style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 22, boxShadow: "var(--shadow-soft)", padding: "20px" }}>
-          <div className="form-heading" style={{ padding: 0, marginBottom: 12 }}>
-            <div><p className="eyebrow">Observabilidad</p><h2 style={{ fontSize: 20 }}>Grafana</h2></div>
+        <section className="grafana-card">
+          <div className="grafana-card-head">
+            <div className="grafana-brand">
+              <span className="grafana-mark"><GrafanaIcon size={28} color="currentColor" /></span>
+              <div><p className="eyebrow">Observabilidad</p><h2>Grafana</h2></div>
+            </div>
+            <span className="grafana-status"><i /> Local</span>
           </div>
-          <p style={{ color: "var(--muted)", fontSize: 12, margin: "0 0 14px" }}>Dashboards en tiempo real (broker) e históricos (base de datos) para la incubadora.</p>
-          <a href="http://localhost:3000" target="_blank" rel="noreferrer" className="button secondary compact">Abrir Grafana</a>
+          <p className="grafana-card-copy">Observa la incubadora con el pulso del broker y el contexto histórico de PostgreSQL.</p>
+          <div className="grafana-signal-grid" aria-label="Fuentes de observabilidad">
+            <span><strong>Tiempo real</strong><small>MQTT · streaming</small></span>
+            <span><strong>Histórico</strong><small>PostgreSQL · SQL</small></span>
+          </div>
+          <div className="grafana-card-foot">
+            <a href="http://localhost:3000" target="_blank" rel="noreferrer" className="button grafana-launch">Abrir Grafana <span aria-hidden="true">↗</span></a>
+            <span className="grafana-endpoint">localhost:3000</span>
+          </div>
         </section>
       </div>
     </div>

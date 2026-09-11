@@ -59,4 +59,4 @@ mosquitto_pub -h localhost -p 1883 -q 1 -r \
   -m '{"nodo_id":"SE-01","estado":"online","timestamp":"2026-09-02T12:00:00Z"}'
 ```
 
-Los payloads definitivos y la matriz de topics están documentados en `docs/ROL4_MQTT_GRAFANA.md`.
+Los payloads definitivos y la matriz de topics están documentados en `README.md` y `docs/ManualTecnico.md`.

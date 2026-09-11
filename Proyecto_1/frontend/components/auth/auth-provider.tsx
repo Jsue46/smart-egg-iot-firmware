@@ -68,6 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.replace("/login");
   }, [router]);
 
+  // El middleware protege la carga inicial. Esta barrera evita que una
+  // navegación del cliente llegue a pintar contenido antes de validar la sesión.
+  if ((!hydrated || !user) && pathname !== "/login") return null;
+
   return <AuthContext.Provider value={{ user, isAuthenticated: Boolean(user), login, logout }}>{children}</AuthContext.Provider>;
 }
 

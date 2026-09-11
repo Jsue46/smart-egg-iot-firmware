@@ -36,9 +36,17 @@ Antes de utilizar la plataforma, verifique que los servicios estén disponibles:
 	| `op1` | `op1pass` | Operador 1 |
 	| `op2` | `op2pass` | Operador 2 |
 
-5. Después de iniciar sesión, la aplicación conserva la sesión durante un día. Para terminarla, use **Cerrar sesión** en la barra lateral.
+5. Después de iniciar sesión, la aplicación conserva la sesión durante un día. Para terminarla, use **Cerrar sesión** en la barra lateral; en celular está disponible como botón de salida en la barra superior.
 
 La navegación se adapta al rol del usuario. Todos los perfiles pueden consultar el Panel, Lotes, Reportes, Registrar lote y Perfil. Los operadores también disponen de **Puerta** y únicamente el administrador dispone de **Administración**.
+
+**Evidencia de acceso:**
+
+![Pantalla de inicio de sesión de SmartEgg](imagenes/frontend-login.png)
+
+En celulares se muestra únicamente el formulario de acceso, con la identidad de SmartEgg y sin desplazamiento vertical.
+
+![Inicio de sesión en celular](imagenes/frontend-login-mobile.png)
 
 ### 11.2 Elementos generales de la interfaz
 
@@ -49,6 +57,8 @@ La aplicación contiene una barra lateral y una barra superior:
 - La barra superior muestra la sección actual, el estado del nodo `SE-01` y el centro de alarmas.
 - El indicador **En línea** representa la disponibilidad del nodo según la telemetría recibida. Si el nodo no responde, se muestra **Desconectado**.
 - En pantallas pequeñas se utiliza una navegación inferior.
+
+![Panel móvil con navegación inferior en una sola fila](imagenes/frontend-panel-mobile-320.png)
 
 ### 11.3 Panel de monitoreo en vivo (`/dashboard`)
 
@@ -76,6 +86,12 @@ La sección **Cámara de incubación interactiva (p5.js)** muestra una represent
 - Si existe una condición crítica, aparece una alerta visual en la escena.
 
 La visualización se actualiza consultando periódicamente el endpoint `GET /datos` del backend. Si la API no está disponible, el indicador cambia a estado desconectado y la escena conserva temporalmente la última lectura conocida.
+
+**Evidencia del Panel y la vista ampliada:**
+
+![Panel de monitoreo en vivo](imagenes/frontend-panel.png)
+
+![Vista ampliada del modelo 3D](imagenes/frontend-3d-ampliado.png)
 
 #### Analítica histórica con Chart.js
 
@@ -109,6 +125,12 @@ Use **Pausar datos** para detener temporalmente la actualización visual del Pan
 
 El sistema valida los campos, registra el lote mediante el backend y muestra una ficha de incubación con los datos guardados. Si el disco está lleno o la cantidad supera la capacidad disponible, el registro se rechaza y se muestra el motivo.
 
+**Evidencia de lotes:**
+
+![Listado de lotes](imagenes/frontend-lotes.png)
+
+![Formulario de registro de lote](imagenes/frontend-registro-lote.png)
+
 ### 11.5 Control de puerta (`/puerta`)
 
 Esta sección está disponible para Operador 1 y Operador 2. El administrador no tiene habilitada la operación física desde este módulo.
@@ -121,6 +143,8 @@ Esta sección está disponible para Operador 1 y Operador 2. El administrador no
 6. Consulte **Últimos eventos** para verificar el operador, la acción, la cantidad trasladada y la fecha/hora.
 
 Cada acción se envía al endpoint `POST /puerta`, se almacena en la bitácora y se publica como evento MQTT. El historial se consulta mediante `GET /accesos-puerta`.
+
+![Módulo de control e historial de puerta](imagenes/frontend-puerta.png)
 
 ### 11.6 Centro de alarmas y atención de incidentes
 
@@ -140,6 +164,8 @@ Desde el centro de alarmas puede:
 - Activar o silenciar el sonido.
 - Ocultar el banner visual sin eliminar el registro.
 
+![Centro de notificaciones sobre el contenido de la aplicación](imagenes/frontend-notificaciones.png)
+
 El backend conserva las alarmas con tipo, severidad, mensaje, estado activo, inicio y resolución. La resolución de una alarma depende de que la condición ambiental vuelva al rango configurado por el sistema; ocultar el banner no resuelve la condición física.
 
 ### 11.7 Reportes y bitácora (`/reportes`)
@@ -155,6 +181,8 @@ La sección **Reportes** presenta un resumen operativo y una bitácora combinada
 
 El reporte incluye información del operador, lotes, lecturas actuales, alarmas y eventos disponibles para la sesión. El backend también expone `GET /reporte` para generar el reporte PDF consolidado del servicio.
 
+![Reportes, filtros, alarmas y paginación](imagenes/frontend-reportes.png)
+
 ### 11.8 Perfil de usuario (`/perfil`)
 
 En **Perfil**, cada usuario puede consultar:
@@ -167,6 +195,8 @@ En **Perfil**, cada usuario puede consultar:
 
 Use el enlace **Ir a informes generales** para abrir la sección de reportes.
 
+![Perfil de usuario y estado de la incubadora](imagenes/frontend-perfil.png)
+
 ### 11.9 Consola de administración (`/admin`)
 
 La consola está disponible únicamente para el usuario Administrador.
@@ -177,10 +207,12 @@ En esta pantalla se pueden consultar:
 - Alarmas activas.
 - Accesos a la puerta y cantidad de aperturas.
 - Operadores registrados, con sus lotes y accesos asociados.
-- Últimas alarmas, su estado y duración.
+- Últimas alarmas, su estado y duración; se muestran cinco por página para facilitar la revisión.
 - Últimas aperturas y cierres de puerta.
 
 Use **Actualizar** para volver a consultar la información del backend. Desde el bloque **Grafana** puede abrir `http://localhost:3000` en una nueva pestaña para revisar los dashboards de monitoreo MQTT e histórico.
+
+![Consola de administración, alarmas paginadas y acceso a Grafana](imagenes/frontend-administracion.png)
 
 ### 11.10 Estados de conexión y solución de problemas
 

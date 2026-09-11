@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useToast } from "@/components/ui/toast-provider";
-import { ConnectionIcon, UserIcon } from "@/components/icons/egg-icons";
+import { ConnectionIcon, EyeIcon, EyeOffIcon, LockIcon, UserIcon } from "@/components/icons/egg-icons";
 
 const loginSchema = z.object({
   username: z.string().trim().min(1, "Escribe tu usuario"),
@@ -19,6 +19,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const { showToast } = useToast();
   const [denied, setDenied] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { username: "", password: "" },
@@ -31,92 +32,123 @@ export default function LoginPage() {
       showToast({ title: "Acceso denegado", message: result.message, tone: "error" });
       return;
     }
+    setDenied(false);
     showToast({ title: "Bienvenido", message: `Sesión iniciada como ${result.user.name}.`, tone: "success" });
   };
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        padding: "34px 20px",
-        background:
-          "radial-gradient(circle at 88% 9%, rgba(0,143,150,.075), transparent 26%), radial-gradient(circle at 9% 82%, rgba(102,131,66,.075), transparent 24%), var(--shell)",
-      }}
-    >
-      <div style={{ width: "min(1020px, 100%)", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, alignItems: "stretch" }}>
-        <section
-          style={{
-            position: "relative",
-            overflow: "hidden",
-            borderRadius: 24,
-            padding: "38px 34px",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
-            color: "#fff8e9",
-            background: "linear-gradient(165deg, #2f7262 0%, var(--forest) 50%, var(--forest-deep) 100%)",
-            boxShadow: "var(--shadow-lift)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span
-              className="brand-mark"
-              style={{ width: 42, height: 49, display: "grid", placeItems: "center", background: "#efb216", borderRadius: "50% 50% 48% 48% / 62% 62% 40% 40%", transform: "rotate(2deg)" }}
-              aria-hidden="true"
-            >
-              <span />
-            </span>
+    <main className="login-page">
+      <section className="login-showcase" aria-labelledby="login-showcase-title">
+        <div className="login-orbit login-orbit-one" aria-hidden="true" />
+        <div className="login-orbit login-orbit-two" aria-hidden="true" />
+        <div className="login-showcase-inner">
+          <div className="login-brand-lockup">
+            <span className="brand-mark login-brand-mark" aria-hidden="true"><span /></span>
             <div>
-              <strong style={{ font: "500 22px Georgia, serif", letterSpacing: "-0.02em" }}>SmartEgg</strong>
-              <p style={{ margin: 0, color: "rgba(255,248,233,.72)", fontSize: 12 }}>Incubación precisa</p>
+              <strong>SmartEgg</strong>
+              <small>Incubación precisa</small>
             </div>
           </div>
 
-          <div>
-            <p className="eyebrow" style={{ color: "#d9e7e0", margin: "30px 0 6px" }}>Control de acceso</p>
-            <h2 style={{ margin: 0, font: "500 clamp(26px, 3vw, 34px) Georgia, serif", letterSpacing: "-0.02em", lineHeight: 1.1 }}>Un panel, tres roles, mismo equipo.</h2>
-            <p style={{ color: "#d9e7e0", fontSize: 14, margin: "14px 0 0", maxWidth: 380 }}>
-              Accede con tu cuenta para vigilar la incubadora, registrar lotes, abrir la puerta o administrar el sistema según tu rol.
-            </p>
+          <div className="login-showcase-copy">
+            <span className="login-kicker"><span className="login-kicker-dot" aria-hidden="true" /> Plataforma de monitoreo inteligente</span>
+            <h1 id="login-showcase-title">Cada ciclo,<br /><em>bajo control.</em></h1>
+            <p>Supervisa el ambiente de tu incubadora, toma decisiones a tiempo y protege cada etapa del proceso desde un solo lugar.</p>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 30, padding: "12px 14px", borderRadius: 15, background: "rgba(102,131,66,.22)", border: "1px solid rgba(171,196,142,.22)" }}>
-            <ConnectionIcon size={34} color="#a7c88a" />
-            <span style={{ display: "flex", flexDirection: "column" }}>
-              <strong style={{ fontSize: 12, fontWeight: 500 }}>Nodo SE-01 en línea</strong>
-              <small style={{ color: "#d9e7e0", fontSize: 11 }}>Monitoreo en vivo de tu incubadora</small>
-            </span>
+          <div className="login-showcase-bottom">
+            <div className="login-sensor-preview" aria-label="Resumen de telemetría de demostración">
+              <div className="login-preview-head">
+                <span><span className="login-live-dot" aria-hidden="true" /> Nodo SE-01</span>
+                <small>Telemetría en vivo</small>
+              </div>
+              <div className="login-sensor-grid">
+                <div className="login-sensor-item">
+                  <small>Temperatura</small>
+                  <strong>37.5 <span>°C</span></strong>
+                </div>
+                <div className="login-sensor-item">
+                  <small>Humedad</small>
+                  <strong>60.5 <span>%</span></strong>
+                </div>
+                <div className="login-sensor-item login-sensor-item-wide">
+                  <small>Estado del sistema</small>
+                  <strong>Estable <span>· 3 espacios disponibles</span></strong>
+                </div>
+              </div>
+            </div>
+            <div className="login-showcase-footer">
+              <span>Proyecto 2 · Grupo 7</span>
+              <span><span className="login-live-dot" aria-hidden="true" /> Sistema preparado para monitoreo</span>
+            </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section style={{ display: "flex", flexDirection: "column", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 24, boxShadow: "var(--shadow-soft)", padding: "34px 32px" }}>
-          <p className="eyebrow" style={{ margin: "0 0 8px" }}>Iniciar sesión</p>
-          <h2 style={{ margin: 0, font: "500 26px Georgia, serif", letterSpacing: "-0.02em" }}>Bienvenido al panel</h2>
-          <p style={{ color: "var(--muted)", fontSize: 13, margin: "8px 0 22px" }}>Usa las credenciales asignadas a tu rol.</p>
+      <section className="login-panel" aria-labelledby="login-panel-title">
+        <div className="login-panel-inner">
+          <div className="login-mobile-brand" aria-label="SmartEgg, incubación precisa">
+            <span className="brand-mark login-mobile-brand-mark" aria-hidden="true"><span /></span>
+            <div>
+              <strong>SmartEgg</strong>
+              <small>Incubación precisa</small>
+            </div>
+          </div>
 
-          <form onSubmit={handleSubmit(submit)} noValidate style={{ display: "grid", gap: 16 }}>
-            <div className="field">
+          <div className="login-panel-header">
+            <p className="eyebrow">Acceso seguro</p>
+            <h2 id="login-panel-title">Bienvenido de nuevo</h2>
+            <p>Ingresa con las credenciales asignadas a tu rol para continuar.</p>
+          </div>
+
+          <form className="login-form" onSubmit={handleSubmit(submit)} noValidate>
+            <div className="login-field">
               <label htmlFor="username">Usuario</label>
-              <div style={{ position: "relative" }}>
-                <UserIcon size={19} color="var(--muted)" />
-                <input id="username" autoComplete="username" placeholder="Ej. op1" aria-invalid={Boolean(errors.username)} {...register("username")} style={{ paddingLeft: 44 }} />
+              <div className="login-input-wrap">
+                <UserIcon size={20} color="var(--forest)" aria-hidden="true" />
+                <input id="username" autoComplete="username" placeholder="Ej. op1" aria-invalid={Boolean(errors.username)} {...register("username")} />
               </div>
               {errors.username ? <span className="field-error" role="alert">{errors.username.message}</span> : null}
             </div>
-            <div className="field">
+
+            <div className="login-field">
               <label htmlFor="password">Contraseña</label>
-              <input id="password" type="password" autoComplete="current-password" placeholder="Tu contraseña" aria-invalid={Boolean(errors.password)} {...register("password")} />
+              <div className="login-input-wrap">
+                <LockIcon size={20} color="var(--forest)" aria-hidden="true" />
+                <input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Tu contraseña" aria-invalid={Boolean(errors.password)} {...register("password")} />
+                <button
+                  type="button"
+                  className="login-password-toggle"
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                >
+                  {showPassword ? <EyeOffIcon size={20} color="var(--muted)" /> : <EyeIcon size={20} color="var(--muted)" />}
+                </button>
+              </div>
               {errors.password ? <span className="field-error" role="alert">{errors.password.message}</span> : null}
             </div>
-            {denied ? <p className="field-error" role="alert" style={{ margin: 0 }}>Usuario o contraseña incorrectos. Revisa las credenciales de tu rol.</p> : null}
-            <button type="submit" className="button primary" disabled={isSubmitting} style={{ width: "100%" }}>
-              Entrar al panel
+
+            {denied ? <p className="login-form-error" role="alert">Usuario o contraseña incorrectos. Revisa las credenciales de tu rol.</p> : null}
+
+            <button type="submit" className="button primary login-submit" disabled={isSubmitting}>
+              <span>Entrar al panel</span>
+              <span className="login-submit-arrow" aria-hidden="true">↗</span>
             </button>
           </form>
-        </section>
-      </div>
+
+          <div className="login-role-note">
+            <ConnectionIcon size={27} color="var(--forest)" aria-hidden="true" />
+            <div>
+              <strong>Acceso por roles</strong>
+              <span>Administrador · Operador 1 · Operador 2</span>
+            </div>
+          </div>
+
+          <p className="login-panel-footer">SmartEgg · Monitoreo de incubación avícola</p>
+          <p className="login-mobile-footer">SmartEgg · Proyecto 2 · Grupo 7</p>
+        </div>
+      </section>
     </main>
   );
 }

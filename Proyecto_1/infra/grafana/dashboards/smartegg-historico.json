@@ -302,7 +302,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 15,
+        "w": 24,
         "x": 0,
         "y": 9
       },
@@ -328,7 +328,7 @@
             "uid": "smartegg-postgres"
           },
           "format": "table",
-          "rawSql": "SELECT COALESCE(l.codigo, 'SIN_LOTE') AS \"Lote\", ROUND(MIN(r.temperatura)::numeric, 2) AS \"Minimo (°C)\", ROUND(MAX(r.temperatura)::numeric, 2) AS \"Maximo (°C)\", ROUND(AVG(r.temperatura)::numeric, 2) AS \"Promedio (°C)\", ROUND(AVG(r.humedad)::numeric, 2) AS \"Humedad promedio (%)\" FROM lecturas AS r LEFT JOIN lotes AS l ON l.id = r.lote_id WHERE r.nodo_id = '${node_id}' AND $__timeFilter(r.\"timestamp\") GROUP BY COALESCE(l.codigo, 'SIN_LOTE') ORDER BY \"Lote\";",
+          "rawSql": "SELECT COALESCE(l.codigo, 'SIN_LOTE') AS \"Lote\", ROUND(MIN(r.temperatura)::numeric, 2) AS \"Minimo (°C)\", ROUND(MAX(r.temperatura)::numeric, 2) AS \"Maximo (°C)\", ROUND(AVG(r.temperatura)::numeric, 2) AS \"Promedio (°C)\", ROUND(MIN(r.humedad)::numeric, 2) AS \"Humedad minima (%)\", ROUND(MAX(r.humedad)::numeric, 2) AS \"Humedad maxima (%)\", ROUND(AVG(r.humedad)::numeric, 2) AS \"Humedad promedio (%)\" FROM lecturas AS r LEFT JOIN lotes AS l ON l.id = r.lote_id WHERE r.nodo_id = '${node_id}' AND $__timeFilter(r.\"timestamp\") GROUP BY COALESCE(l.codigo, 'SIN_LOTE') ORDER BY \"Lote\";",
           "refId": "A"
         }
       ],
@@ -370,9 +370,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 9,
-        "x": 15,
-        "y": 9
+        "w": 24,
+        "x": 0,
+        "y": 17
       },
       "id": 4,
       "options": {
@@ -436,7 +436,7 @@
         "h": 5,
         "w": 12,
         "x": 0,
-        "y": 17
+        "y": 25
       },
       "id": 5,
       "options": {
@@ -537,7 +537,7 @@
         "h": 5,
         "w": 12,
         "x": 12,
-        "y": 17
+        "y": 25
       },
       "id": 6,
       "options": {

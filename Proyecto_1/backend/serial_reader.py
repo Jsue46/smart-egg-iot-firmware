@@ -28,6 +28,22 @@ SIMULATE_TELEMETRY = os.getenv("SIMULATE_TELEMETRY", "false").lower() in {
     "on",
 }
 
+
+def _parse_optional_int(value: str) -> int | None:
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        LOGGER.warning("SIMULATION_LOT_ID no es un entero válido; se omitirá.")
+        return None
+
+
+# Permite que el modo simulado genere evidencia histórica asociada a un lote.
+# En modo serial real, el lote continúa llegando desde la trama del Arduino.
+SIMULATION_LOT_ID = _parse_optional_int(os.getenv("SIMULATION_LOT_ID", ""))
+
 _stop_event = threading.Event()
 _dato_lock = threading.Lock()
 ultimo_dato: dict[str, Any] = {}
@@ -243,6 +259,7 @@ def _simulated_reading() -> dict[str, Any]:
     humedad = round(random.uniform(48.0, 67.0), 1)
     return {
         "nodo_id": NODE_ID,
+        "lote_id": SIMULATION_LOT_ID,
         "temperatura": temperatura,
         "humedad": humedad,
         "espacios_libres": random.randint(0, 3),

@@ -116,6 +116,18 @@ export function ReportIcon({ size = 48, color = "currentColor", ...props }: EggI
   );
 }
 
+export function GrafanaIcon({ size = 48, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props}>
+      <path d="M11.3 27.8a13.2 13.2 0 1 1 5.1 7.9" />
+      <path d="M14.7 22.1a9.2 9.2 0 1 1 5.1 10.2" />
+      <path d="M21.1 18.8a5.8 5.8 0 1 1-1.5 7.8" />
+      <circle cx="31.8" cy="30.8" r="3.2" fill={color} stroke="none" />
+      <circle cx="35.3" cy="20.1" r="1.7" fill={color} stroke="none" />
+    </svg>
+  );
+}
+
 export function DashboardIcon({ size = 48, color = "currentColor", ...props }: EggIconProps) {
   return (
     <svg {...common(size, color)} {...props}>
@@ -226,6 +238,33 @@ export function UserIcon({ size = 20, color = "currentColor", ...props }: EggIco
       <EggShell />
       <circle cx="24" cy="19.5" r="5.5" />
       <path d="M15.5 34c1.7-4.6 5-6.9 8.5-6.9s6.8 2.3 8.5 6.9" />
+    </svg>
+  );
+}
+
+export function LockIcon({ size = 20, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props} viewBox="0 0 24 24">
+      <rect x="5" y="10" width="14" height="10" rx="2" />
+      <path d="M8 10V7.5a4 4 0 0 1 8 0V10M12 14.5v2.2" />
+    </svg>
+  );
+}
+
+export function EyeIcon({ size = 20, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props} viewBox="0 0 24 24">
+      <path d="M3.5 12s3.2-5 8.5-5 8.5 5 8.5 5-3.2 5-8.5 5-8.5-5-8.5-5Z" />
+      <circle cx="12" cy="12" r="2.3" />
+    </svg>
+  );
+}
+
+export function EyeOffIcon({ size = 20, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props} viewBox="0 0 24 24">
+      <path d="M3.5 12s3.2-5 8.5-5c1.1 0 2.1.2 3 .6M20.5 12s-3.2 5-8.5 5c-1.1 0-2.1-.2-3-.6" />
+      <path d="m4 4 16 16" />
     </svg>
   );
 }

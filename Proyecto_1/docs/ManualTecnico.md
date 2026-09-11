@@ -122,7 +122,7 @@ Diagrama interactivo (dbdiagram.io): https://dbdiagram.io/d/6a9e6fc850ad2c46dc5a
 
 ## 5. API Contracts del Backend
 
-El contrato OpenAPI completo del sistema se encuentra definido en [`docs/openapi.yaml`](docs/openapi.yaml).
+El contrato OpenAPI completo del sistema se encuentra definido en [`openapi.yaml`](openapi.yaml).
 
 ### 5.1 Catálogo de Endpoints Principales
 * `GET /health`: Comprobación de estado del servicio y conectividad con la base de datos.
@@ -144,6 +144,19 @@ Los dashboards se provisionan automáticamente mediante archivos de configuraci�
 * **SmartEgg - Analítica Histórica:** Panel de agregación conectado mediante SQL directo a PostgreSQL. Despliega tendencias de temperatura/humedad por lote, métricas de ocupación, valores mínimos/máximos/promedio, duración acumulada de alarmas y accesos de operadores.
 ![analitica-historica](imagenes/analitica-historica1.png)
 ![analitica-historica](imagenes/analitica-historica2.png)
+
+### 6.1 Evidencias del broker MQTT
+
+Pruebas ejecutadas con `mosquitto_sub` dentro del contenedor del broker:
+
+* **Telemetría:** recepción de temperatura, humedad, actuadores, alarmas y estado del nodo.
+  ![Evidencia de telemetría MQTT](imagenes/MQTT_Telemetria.png)
+* **Retained:** un suscriptor nuevo recibe inmediatamente el último estado retenido del nodo.
+  ![Evidencia de mensaje retained](imagenes/MQTT_Retained.png)
+* **LWT:** al detener abruptamente el cliente de prueba, el broker publica `offline` con `valor: 0` y `motivo: lwt`.
+  ![Evidencia de LWT offline](imagenes/MQTT_LWT.png)
+
+La prueba LWT utiliza el topic aislado `smartegg/ROL4-TEST/status` para no interrumpir el nodo de demostración; el backend utiliza `smartegg/SE-01/status`.
 
 ## 7. Explicación de los frameworks/librerías y enlace al video demostrativo
 
@@ -216,8 +229,59 @@ Esta separación permite utilizar cada herramienta según su propósito: p5.js s
 * **Duración:** 4:21 minutos
 
 
-## 8. Documento comparativo HTTP vs. MQTT 
+## 8. Documento comparativo HTTP vs. MQTT
 
+SmartEgg utiliza una arquitectura híbrida: HTTP/REST para operaciones bajo demanda y MQTT para telemetría, estados y eventos en tiempo real.
+
+### 8.1 HTTP en IoT
+
+HTTP sigue el modelo **cliente-servidor de petición/respuesta**. El cliente realiza una solicitud (`GET`, `POST`, `PUT`, `PATCH` o `DELETE`) y el servidor responde con un código de estado y, normalmente, un JSON. En IoT, un dispositivo puede enviar mediciones mediante `POST`, pero el cliente debe volver a consultar para detectar cambios nuevos.
+
+En SmartEgg, REST se utiliza para consultar datos y ejecutar operaciones concretas: `GET /datos`, `GET /historial`, `POST /huevo`, `POST /puerta`, consultas de alarmas/operadores y generación de reportes. Esto permite validaciones, códigos HTTP y contratos OpenAPI.
+
+### 8.2 Optimizaciones HTTP
+
+| Técnica | Beneficio en IoT |
+|---|---|
+| `Keep-Alive` | Reutiliza la conexión TCP/TLS y reduce *handshakes*. |
+| Compresión | `gzip`/Brotli y JSON compacto reducen el payload. |
+| HTTP/2 | Multiplexa solicitudes y comprime cabeceras en una conexión. |
+| Caching | `ETag` y `Cache-Control` evitan transferir datos que no cambiaron. |
+| Batching | Agrupa varias lecturas y reduce solicitudes repetidas. |
+| CoAP | Alternativa REST ligera para dispositivos restringidos, normalmente sobre UDP. |
+
+Estas técnicas optimizan HTTP, pero no lo convierten en un canal *push*; para alarmas inmediatas a varios consumidores se utiliza MQTT.
+
+### 8.3 MQTT en SmartEgg
+
+MQTT usa el modelo **publish/subscribe**: el backend publica en un *topic*, Mosquitto lo distribuye y Grafana/frontend reciben el mensaje sin consultarlo repetidamente. El backend es el publicador porque recibe las lecturas del microcontrolador por serial.
+
+* Temperatura y humedad: QoS 0, porque son lecturas frecuentes.
+* Actuadores, alarmas, status y puerta: QoS 1 para entrega al menos una vez.
+* Status, actuadores y alarma: mensajes `retained` para entregar el último estado a nuevos suscriptores.
+* `smartegg/SE-01/status`: LWT retenido con `estado=offline`; al conectar se publica `estado=online`.
+* Las lecturas y eventos completos permanecen en PostgreSQL; MQTT distribuye el estado en vivo, no reemplaza el historial.
+
+### 8.4 Tabla comparativa
+
+| Criterio | HTTP/REST | MQTT |
+|---|---|---|
+| Comunicación | Petición/respuesta. | Publicación/suscripción mediante broker. |
+| Overhead | Cabeceras y estructura más pesadas. | Encabezado pequeño y payload ligero. |
+| Energía/banda | Puede aumentar con *polling* frecuente. | Menor tráfico repetido y conexión persistente. |
+| Eventos | El cliente debe consultar. | Entrega *push* a suscriptores. |
+| Desconexiones | Requiere timeout y reintentos de aplicación. | QoS, retained y LWT ayudan a recuperar estado y detectar caídas. |
+| Escalabilidad | Cada consumidor consulta al servidor. | El broker distribuye a múltiples consumidores. |
+| Historial | Requiere una base de datos externa. | `Retained` guarda solo el último estado; el histórico requiere PostgreSQL. |
+| Uso en SmartEgg | CRUD, puerta, consultas y PDF. | Telemetría, actuadores, alarmas y status para Grafana/frontend. |
+
+### 8.5 Justificación de la arquitectura
+
+Se eligió **MQTT para telemetría y eventos** porque son mensajes pequeños y frecuentes que deben llegar en vivo a Grafana y al frontend. El broker desacopla los componentes y permite usar QoS 1, `retained` y LWT.
+
+Se eligió **REST/HTTP para CRUD y consultas** porque registrar lotes, controlar la puerta, consultar históricos y generar reportes requiere una respuesta explícita, validaciones y códigos de estado.
+
+Por tanto, el flujo queda separado así: **serial** entre microcontrolador y backend, **MQTT** para distribución en tiempo real, **REST/HTTP** para operaciones bajo demanda y **PostgreSQL** para persistencia histórica.
 
 ## 9. Instrucciones y evidencia de la orquestación con Docker.
 
@@ -247,6 +311,7 @@ docker compose logs postgres
   docker compose up -d --force-recreate backend
   Invoke-RestMethod http://localhost:5000/health | ConvertTo-Json
   ```
+  Para que las lecturas aparezcan en la analítica por lote, registre primero un lote y defina `SIMULATION_LOT_ID=<id_del_lote>` en `.env` antes de recrear el backend.
 
 ### 9.3 Servicios y accesos
 
