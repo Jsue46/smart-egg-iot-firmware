@@ -224,9 +224,8 @@ Esta separación permite utilizar cada herramienta según su propósito: p5.js s
 * **REST y `fetch`:** mantienen una integración simple entre el frontend y Flask. El sondeo periódico permite refrescar los datos sin recargar la página completa.
 
 ### 7.6 Video Demostrativo
-* **Demostración en video (4 min):** [Ver Video Demostrativo de SmartEgg](https://drive.google.com/file/d/154BJDqPCBuRmhvK30u8I7iYwhhcL9cLo/view?usp=sharing)
+* **Demostración en video:** [Ver Video Demostrativo de SmartEgg (Google Drive)](https://drive.google.com/drive/folders/1w0q4TgvbBKzDrHfzG4wQCiI1_iPQEONU?usp=sharing)
 * **Plataforma:** Google Drive
-* **Duración:** 4:21 minutos
 
 
 ## 8. Documento comparativo HTTP vs. MQTT

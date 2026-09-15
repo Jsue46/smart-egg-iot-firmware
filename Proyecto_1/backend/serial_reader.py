@@ -254,6 +254,40 @@ def guardar_lectura(data: dict[str, Any]) -> None:
         mqtt_publisher.publish_alarm(**alarm_publication)
 
 
+def guardar_acceso_puerta_rfid(accion: str = "ABRIR", operador_id: int | None = 1) -> None:
+    nodo_id = NODE_ID
+    conn = get_connection()
+    try:
+        created = execute(
+            conn,
+            """
+            INSERT INTO accesos_puerta (nodo_id, operador_id, accion, cantidad_huevos)
+            VALUES (?, ?, ?, ?)
+            RETURNING id, nodo_id, operador_id, accion, cantidad_huevos, timestamp
+            """,
+            (nodo_id, operador_id, accion, 0),
+        ).fetchone()
+        conn.commit()
+    except Exception as exc:
+        conn.rollback()
+        LOGGER.warning("Error registrando acceso RFID a la puerta: %s", exc)
+        return
+    finally:
+        conn.close()
+
+    if created:
+        event_id = created["id"] if isinstance(created, dict) else created[0]
+        timestamp = created["timestamp"] if isinstance(created, dict) else str(created[5])
+        mqtt_publisher.publish_door_event(
+            event_id=event_id,
+            action=accion,
+            operator_id=operador_id,
+            egg_count=0,
+            timestamp=timestamp,
+        )
+        LOGGER.info("Acceso RFID [ABRIR] registrado en BD (ID: %s) y publicado vía MQTT", event_id)
+
+
 def _simulated_reading() -> dict[str, Any]:
     temperatura = round(random.uniform(36.5, 39.0), 1)
     humedad = round(random.uniform(48.0, 67.0), 1)
@@ -297,8 +331,19 @@ def leer_serial() -> None:
                 LOGGER.info("Serial conectado en %s", puerto)
                 while not _stop_event.is_set():
                     linea = ser.readline().decode("utf-8", errors="ignore").strip()
-                    if not linea or not linea.startswith("{"):
+                    if not linea:
                         continue
+                    if "[RFID] Acceso concedido" in linea:
+                        LOGGER.info("Acceso RFID detectado en puerto serial. Registrando [ABRIR] en BD...")
+                        guardar_acceso_puerta_rfid("ABRIR", operador_id=1)
+                        continue
+                    if "PUERTA CERRADA" in linea:
+                        LOGGER.info("Cierre de puerta detectado en puerto serial. Registrando [CERRAR] en BD...")
+                        guardar_acceso_puerta_rfid("CERRAR", operador_id=1)
+                        continue
+                    if not linea.startswith("{"):
+                        continue
+                    print(f" Recibido del Arduino: {linea}")
                     try:
                         guardar_lectura(json.loads(linea))
                     except (TypeError, ValueError, KeyError, json.JSONDecodeError) as exc:

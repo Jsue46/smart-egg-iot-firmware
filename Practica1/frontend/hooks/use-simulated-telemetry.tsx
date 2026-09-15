@@ -112,7 +112,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
           notas: "",
         })
       }).then(() => fetchData());
-      
+
       const newLot: Lot = { ...input, id: "TEMP", status: "incubando", progress: 1 };
       return newLot;
     },
@@ -135,7 +135,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       technician: authenticatedTechnician,
       addLot,
       togglePaused: () => setIsPaused((paused) => !paused),
-      triggerDemoAlarm: () => {},
+      triggerDemoAlarm: () => { },
     }),
     [addLot, alarms, history, humidity, isAlarm, isOnline, isPaused, lots, occupied, servoAngle, temperature]
   );

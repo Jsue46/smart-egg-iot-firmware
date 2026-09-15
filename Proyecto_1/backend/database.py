@@ -293,11 +293,16 @@ def init_db() -> None:
     conn = get_connection()
     try:
         schema = POSTGRES_SCHEMA if USE_POSTGRES else SQLITE_SCHEMA
-        for statement in schema:
+        tables = [s for s in schema if not s.strip().startswith("CREATE INDEX")]
+        indexes = [s for s in schema if s.strip().startswith("CREATE INDEX")]
+        for statement in tables:
             execute(conn, statement)
         if not USE_POSTGRES:
             _ensure_sqlite_columns(conn)
+        for statement in indexes:
+            execute(conn, statement)
         _seed_defaults(conn)
         conn.commit()
     finally:
         conn.close()
+

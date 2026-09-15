@@ -68,7 +68,9 @@ El dashboard en vivo usa una composición oscura tipo operación, series suaves 
 
 El contrato OpenAPI está en [`docs/openapi.yaml`](docs/openapi.yaml). Endpoints principales:
 
-`GET /health`, `GET /datos`, `GET /historial`, `POST /huevo`, `GET /huevos`, `GET /alarmas`, `GET /operadores`, `POST /puerta`, `GET /accesos-puerta` y `GET /reporte`.
+## Video Demostrativo
+
+- [Ver Video Demostrativo de SmartEgg en Google Drive](https://drive.google.com/drive/folders/1w0q4TgvbBKzDrHfzG4wQCiI1_iPQEONU?usp=sharing)
 
 ## Verificación rápida
 

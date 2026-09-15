@@ -79,6 +79,8 @@ def leer_serial():
                 while True:
                     linea = ser.readline().decode("utf-8").strip()
                     if linea.startswith("{"):
+                        # Mostrar el dato crudo en la terminal de Python
+                        print(f"Dato Serial Recibido: {linea}")
                         data = json.loads(linea)
                         ultimo_dato = data
                         guardar_lectura(data)
