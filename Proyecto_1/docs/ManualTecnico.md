@@ -83,6 +83,31 @@ La arquitectura de **SmartEgg IoT** desacopla la adquisición de señales físic
 
 > **Estandarización temporal:** Todos los timestamps se publican y almacenan en formato UTC / ISO 8601 para garantizar consistencia. Ambos dashboards en Grafana operan con `timezone: browser`, adaptando automáticamente las series temporales al huso horario del operador.
 
+### 2.4 Flujo de alarmas del frontend: cliente MQTT vs cliente REST
+
+El frontend (Next.js / React / TypeScript) mantiene **dos clientes de transporte separados** para cumplir la separación entre datos en tiempo real y datos bajo demanda:
+
+* **Cliente MQTT (alarmas y eventos en vivo):** implementado con la librería `mqtt.js` sobre WebSocket (`ws://localhost:9001`). Se suscribe a los tópicos críticos del broker:
+  * `smartegg/SE-01/alarmas/critica` — condiciones fuera de rango.
+  * `smartegg/SE-01/puerta/evento` — apertura/cierre de cabina.
+  * `smartegg/SE-01/status` — disponibilidad del nodo (LWT).
+  * `smartegg/SE-01/actuadores/estado` — estados de actuadores y rotación.
+
+  Al recibir un mensaje de `alarmas/critica` con `activa: true`, la interfaz propaga el evento en menos de 3 segundos: banner **ALARMA ACTIVA**, *toast* emergente, indicador sonoro (desactivable) y actualización del centro de alarmas con la distinción entre eventos **activos** y **resueltos**. La notificación se dispara por *transición* de estado (activa → resuelta), no por cada lectura, para evitar repetir sonidos mientras la condición permanece fuera de rango.
+
+* **Cliente HTTP/REST (datos generales bajo demanda):** implementado con `fetch` hacia la API de Flask para lecturas periódicas y operaciones transaccionales:
+  * Consultas: `GET /datos`, `GET /historial`, `GET /huevos`, `GET /alarmas`, `GET /accesos-puerta`, `GET /operadores`, `GET /reporte`.
+  * Operaciones: `POST /huevo` (registro de ficha/lote) y `POST /puerta` (apertura/cierre).
+
+  Este cliente alimenta los paneles, gráficos (Chart.js), listados de lotes, el perfil del operador, la consola de administración y el generador de reportes PDF, con sondeo ligero de 2 segundos y validación explícita mediante códigos HTTP.
+
+| Canal | Rol | Mecanismo | Latencia esperada |
+|---|---|---|---|
+| MQTT (WebSocket) | Alarmas, eventos de puerta y estado del nodo | Publicador/suscriptor vía broker | < 3 s (push, sin recarga) |
+| HTTP/REST | Consultas y transacciones (lotes, puerta, reportes, administración) | Petición/respuesta con códigos de estado | Bajo demanda (+ sondeo 2 s) |
+
+Esta separación sigue lo recomendado para el proyecto: las alarmas viajan por el canal *push* (MQTT) para evitar el sondeo de condiciones críticas, mientras los datos generales se consultan por REST sin mezclar ambos flujos.
+
 ## 3. Documentación de la Jerarquía de Topics MQTT
 
 | Topic | QoS | Retained | Publicador | Suscriptores | Contenido / Payload |
