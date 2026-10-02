@@ -169,18 +169,26 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
           client?.subscribe(
             [
               `smartegg/${NODE_ID}/status`,
+              `smartegg/${NODE_ID}/sensores/temperatura`,
+              `smartegg/${NODE_ID}/sensores/humedad`,
               `smartegg/${NODE_ID}/actuadores/estado`,
               `smartegg/${NODE_ID}/alarmas/critica`,
               `smartegg/${NODE_ID}/puerta/evento`,
             ],
-            { qos: 1 },
+            { qos: 0 },
           );
         });
-        client.on("message", (topic, message) => {
+        client.on("message", (topic: string, message: Buffer) => {
           try {
             const payload = JSON.parse(message.toString());
             if (topic.endsWith("/status")) {
               setIsOnline(payload.estado === "online");
+            } else if (topic.endsWith("/sensores/temperatura")) {
+              const val = Number(payload.valor ?? payload.temperatura);
+              if (Number.isFinite(val)) setTemperature(val);
+            } else if (topic.endsWith("/sensores/humedad")) {
+              const val = Number(payload.valor ?? payload.humedad);
+              if (Number.isFinite(val)) setHumidity(val);
             } else if (topic.endsWith("/actuadores/estado")) {
               const mqttRotation = Number(payload.rotacion_grados ?? payload.servo_ang);
               if (Number.isFinite(mqttRotation)) setServoAngle(mqttRotation);
@@ -189,8 +197,8 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
             } else if (topic.endsWith("/alarmas/critica")) {
               const alarm = mqttAlarm(payload);
               setIsAlarm(payload.activa === true || payload.activa === 1);
-              setAlarms((current) => {
-                const withoutCurrent = current.filter((item) => item.id !== alarm.id);
+              setAlarms((current: Alarm[]) => {
+                const withoutCurrent = current.filter((item: Alarm) => item.id !== alarm.id);
                 return [alarm, ...withoutCurrent].slice(0, 50);
               });
             } else if (topic.endsWith("/puerta/evento")) {
@@ -245,7 +253,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       detail: "Alerta local de demostración; no se publicó en el broker.",
       severity: "warning",
     };
-    setAlarms((current) => [alarm, ...current].slice(0, 50));
+    setAlarms((current: Alarm[]) => [alarm, ...current].slice(0, 50));
     setIsAlarm(true);
     window.setTimeout(() => setIsAlarm(false), 9000);
   }, []);
@@ -269,7 +277,7 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       technician:
         user ? { name: user.name, id: user.badge, role: ROLE_LABELS[user.role] } : authenticatedTechnician,
       addLot,
-      togglePaused: () => setIsPaused((paused) => !paused),
+      togglePaused: () => setIsPaused((paused: boolean) => !paused),
       triggerDemoAlarm,
     }),
     [addLot, alarms, doorOpen, fanOn, heaterOn, history, humidity, isAlarm, isOnline, isPaused, lots, occupied, servoAngle, temperature, triggerDemoAlarm, user],

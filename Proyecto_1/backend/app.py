@@ -87,6 +87,20 @@ def get_datos():
     return jsonify({"mensaje": "Sin datos aún"}), 503
 
 
+@app.post("/datos")
+def post_datos():
+    raw_data = request.get_json(silent=True) or {}
+    if not raw_data:
+        return jsonify({"error": "Payload JSON requerido"}), 400
+
+    try:
+        serial_reader.guardar_lectura(raw_data)
+        return jsonify({"mensaje": "Lectura registrada correctamente"}), 201
+    except Exception as exc:
+        LOGGER.warning("Error guardando lectura via API REST: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
 @app.get("/historial")
 def get_historial():
     limit = min(max(int(request.args.get("limit", 100)), 1), 1000)

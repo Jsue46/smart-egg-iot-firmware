@@ -8,10 +8,14 @@ the API and serial reader use the same SQL in both modes.
 
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
+import time
 from pathlib import Path
 from typing import Any, Iterable
+
+LOGGER = logging.getLogger(__name__)
 
 
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
@@ -289,20 +293,30 @@ def _seed_defaults(conn) -> None:
             )
 
 
-def init_db() -> None:
-    conn = get_connection()
-    try:
-        schema = POSTGRES_SCHEMA if USE_POSTGRES else SQLITE_SCHEMA
-        tables = [s for s in schema if not s.strip().startswith("CREATE INDEX")]
-        indexes = [s for s in schema if s.strip().startswith("CREATE INDEX")]
-        for statement in tables:
-            execute(conn, statement)
-        if not USE_POSTGRES:
-            _ensure_sqlite_columns(conn)
-        for statement in indexes:
-            execute(conn, statement)
-        _seed_defaults(conn)
-        conn.commit()
-    finally:
-        conn.close()
+def init_db(max_retries: int = 15, delay: float = 2.0) -> None:
+    for attempt in range(1, max_retries + 1):
+        try:
+            conn = get_connection()
+            try:
+                schema = POSTGRES_SCHEMA if USE_POSTGRES else SQLITE_SCHEMA
+                tables = [s for s in schema if not s.strip().startswith("CREATE INDEX")]
+                indexes = [s for s in schema if s.strip().startswith("CREATE INDEX")]
+                for statement in tables:
+                    execute(conn, statement)
+                if not USE_POSTGRES:
+                    _ensure_sqlite_columns(conn)
+                for statement in indexes:
+                    execute(conn, statement)
+                _seed_defaults(conn)
+                conn.commit()
+                LOGGER.info("Base de datos inicializada correctamente.")
+                return
+            finally:
+                conn.close()
+        except Exception as exc:
+            if attempt == max_retries:
+                LOGGER.error("No se pudo conectar a la base de datos tras %s intentos: %s", max_retries, exc)
+                raise
+            LOGGER.warning("Esperando a que la base de datos esté lista (intento %s/%s): %s", attempt, max_retries, exc)
+            time.sleep(delay)
 
