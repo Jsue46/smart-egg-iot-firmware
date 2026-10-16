@@ -1,0 +1,612 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Analítica histórica de SmartEgg desde PostgreSQL: tendencias, ocupación, lotes, alarmas y accesos de puerta.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": 2,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smartegg-postgres"
+      },
+      "description": "Promedios visuales y extremos del rango seleccionado; la humedad usa el eje derecho.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": true,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 12,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 3,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 1,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Temperatura (°C)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "celsius"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#f59e0b",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Humedad (%)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#38bdf8",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 15,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "min"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Name",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smartegg-postgres"
+          },
+          "format": "time_series",
+          "rawSql": "SELECT r.\"timestamp\" AS \"time\", r.temperatura AS \"Temperatura (°C)\", r.humedad AS \"Humedad (%)\" FROM lecturas AS r WHERE $__timeFilter(r.\"timestamp\") AND r.nodo_id = '${node_id}' ORDER BY r.\"timestamp\";",
+          "refId": "A"
+        }
+      ],
+      "title": "Tendencia de temperatura y humedad",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smartegg-postgres"
+      },
+      "description": "Huevos ocupados y espacios libres calculados desde las lecturas persistidas.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": true,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 12,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "max": 3,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 9,
+        "x": 15,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smartegg-postgres"
+          },
+          "format": "time_series",
+          "rawSql": "SELECT r.\"timestamp\" AS \"time\", GREATEST(0, 3 - r.espacios_libres) AS \"Huevos ocupados\", r.espacios_libres AS \"Espacios libres\" FROM lecturas AS r WHERE $__timeFilter(r.\"timestamp\") AND r.nodo_id = '${node_id}' ORDER BY r.\"timestamp\";",
+          "refId": "A"
+        }
+      ],
+      "title": "Ocupación de la bandeja",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smartegg-postgres"
+      },
+      "description": "Resumen térmico y de humedad agrupado por código de lote.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "mode": "gradient",
+              "type": "gauge",
+              "valueDisplayMode": "text"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 3,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": true
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smartegg-postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT COALESCE(l.codigo, 'SIN_LOTE') AS \"Lote\", ROUND(MIN(r.temperatura)::numeric, 2) AS \"Minimo (°C)\", ROUND(MAX(r.temperatura)::numeric, 2) AS \"Maximo (°C)\", ROUND(AVG(r.temperatura)::numeric, 2) AS \"Promedio (°C)\", ROUND(MIN(r.humedad)::numeric, 2) AS \"Humedad minima (%)\", ROUND(MAX(r.humedad)::numeric, 2) AS \"Humedad maxima (%)\", ROUND(AVG(r.humedad)::numeric, 2) AS \"Humedad promedio (%)\" FROM lecturas AS r LEFT JOIN lotes AS l ON l.id = r.lote_id WHERE r.nodo_id = '${node_id}' AND $__timeFilter(r.\"timestamp\") GROUP BY COALESCE(l.codigo, 'SIN_LOTE') ORDER BY \"Lote\";",
+          "refId": "A"
+        }
+      ],
+      "title": "Mínimos, máximos y promedios por lote",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smartegg-postgres"
+      },
+      "description": "Intervalos de alarma en el rango seleccionado, incluyendo las que permanecen activas.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "color-text",
+              "wrapText": false
+            },
+            "filterable": true,
+            "inspect": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "id": 4,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": true
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smartegg-postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT a.tipo AS \"Tipo\", a.severidad AS \"Severidad\", a.mensaje AS \"Mensaje\", a.inicio_at AS \"Inicio\", a.resolucion_at AS \"Resolucion\", ROUND(EXTRACT(EPOCH FROM (COALESCE(a.resolucion_at, NOW()) - a.inicio_at)) / 60.0, 2) AS \"Duracion (min)\" FROM alarmas AS a WHERE a.nodo_id = '${node_id}' AND a.inicio_at <= $__timeTo() AND COALESCE(a.resolucion_at, NOW()) >= $__timeFrom() ORDER BY a.inicio_at DESC;",
+          "refId": "A"
+        }
+      ],
+      "title": "Duración de alarmas críticas",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smartegg-postgres"
+      },
+      "description": "Conteo de eventos de puerta dentro del rango seleccionado.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 25
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "vertical",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smartegg-postgres"
+          },
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) FILTER (WHERE ap.accion = 'ABRIR') AS \"Aperturas\", COUNT(*) FILTER (WHERE ap.accion = 'CERRAR') AS \"Cierres\" FROM accesos_puerta AS ap WHERE ap.nodo_id = '${node_id}' AND $__timeFilter(ap.\"timestamp\");",
+          "refId": "A"
+        }
+      ],
+      "title": "Aperturas y cierres de puerta",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smartegg-postgres"
+      },
+      "description": "Aperturas y cierres agrupados por día para detectar patrones de acceso.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": true,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 25
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smartegg-postgres"
+          },
+          "format": "time_series",
+          "rawSql": "SELECT date_trunc('day', ap.\"timestamp\") AS \"time\", COUNT(*) FILTER (WHERE ap.accion = 'ABRIR') AS \"Aperturas\", COUNT(*) FILTER (WHERE ap.accion = 'CERRAR') AS \"Cierres\" FROM accesos_puerta AS ap WHERE ap.nodo_id = '${node_id}' AND $__timeFilter(ap.\"timestamp\") GROUP BY date_trunc('day', ap.\"timestamp\") ORDER BY \"time\";",
+          "refId": "A"
+        }
+      ],
+      "title": "Eventos de puerta por día",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [
+    "smartegg",
+    "postgresql",
+    "histórico"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "SE-01",
+          "value": "SE-01"
+        },
+        "includeAll": false,
+        "label": "Nodo",
+        "name": "node_id",
+        "options": [
+          {
+            "selected": true,
+            "text": "SE-01",
+            "value": "SE-01"
+          }
+        ],
+        "query": "SE-01",
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "SmartEgg - Analítica histórica",
+  "uid": "smartegg-historico",
+  "version": 2
+}

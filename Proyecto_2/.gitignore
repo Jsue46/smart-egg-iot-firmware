@@ -1,0 +1,21 @@
+# Material local de apoyo
+tmp/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.db
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# Entornos y credenciales locales
+.env
+.env.local
+.env.*.local
+

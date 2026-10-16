@@ -1,0 +1,36 @@
+apiVersion: 1
+
+# Las fuentes se administran como codigo. Rol 2 debe proporcionar estas
+# variables al contenedor de Grafana desde el archivo .env del proyecto.
+prune: true
+
+datasources:
+  - name: SmartEgg MQTT
+    uid: smartegg-mqtt
+    type: grafana-mqtt-datasource
+    access: proxy
+    isDefault: false
+    jsonData:
+      uri: ${MQTT_GRAFANA_URI}
+      username: ${MQTT_USERNAME}
+      clientID: ${GRAFANA_MQTT_CLIENT_ID}
+      tlsAuth: false
+      tlsAuthWithCACert: false
+      tlsSkipVerify: false
+    secureJsonData:
+      password: ${MQTT_PASSWORD}
+
+  - name: SmartEgg PostgreSQL
+    uid: smartegg-postgres
+    type: postgres
+    access: proxy
+    isDefault: true
+    url: ${POSTGRES_HOST}:${POSTGRES_PORT}
+    user: ${POSTGRES_USER}
+    jsonData:
+      database: ${POSTGRES_DB}
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: false
+    secureJsonData:
+      password: ${POSTGRES_PASSWORD}
