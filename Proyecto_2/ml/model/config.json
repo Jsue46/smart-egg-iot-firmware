@@ -1,0 +1,21 @@
+{
+  "features": [
+    "temperatura",
+    "humedad",
+    "foco_i",
+    "ventilador_i",
+    "t_std",
+    "h_std",
+    "t_delta"
+  ],
+  "ventana": 30,
+  "umbral": -0.005199972231384908,
+  "n_estimators": 100,
+  "max_samples": "1024",
+  "metricas_test": {
+    "precision": 0.4897959183673469,
+    "recall": 0.871358135365307,
+    "f1": 0.6270967741935484,
+    "auc_roc": 0.9263092262168093
+  }
+}

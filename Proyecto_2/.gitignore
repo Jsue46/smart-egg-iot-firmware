@@ -19,3 +19,5 @@ dist/
 .env.local
 .env.*.local
 
+# Dataset sintético del módulo ML (se regenera con ml/generar_dataset.py)
+ml/data/lecturas_sinteticas.csv

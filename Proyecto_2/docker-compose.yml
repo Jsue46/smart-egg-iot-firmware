@@ -96,6 +96,22 @@ services:
       - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks: [smartegg]
 
+  ml:
+    build:
+      context: ./ml
+    restart: unless-stopped
+    environment:
+      NODE_ID: ${NODE_ID:-SE-01}
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_CLIENT_ID: ${ML_MQTT_CLIENT_ID:-smartegg-ml-se01}
+    depends_on:
+      mosquitto:
+        condition: service_started
+    networks: [smartegg]
+
   frontend:
     build:
       context: ./frontend
