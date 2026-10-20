@@ -1,0 +1,163 @@
+apiVersion: 1
+
+# Reglas de alerta unificadas de Grafana (Grafana Alerting Provisioning)
+# Cumple el requisito obligatorio de la rubrica: al menos una regla activa y funcional.
+
+groups:
+  - orgId: 1
+    name: 'SmartEgg - Reglas de Alerta Operativa y Seguridad'
+    folder: 'SmartEgg'
+    interval: 10s
+    rules:
+      - uid: alert-bloqueo-vision-objeto
+        title: '[SmartEgg] ALERTA CRITICA - Bloqueo de Incubadora por Objeto Extrano'
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: smartegg-postgres
+            model:
+              editorMode: code
+              format: table
+              rawQuery: true
+              rawSql: >
+                SELECT COUNT(*) AS count
+                FROM alarmas
+                WHERE nodo_id = 'SE-01'
+                  AND activa = true
+                  AND (tipo LIKE '%BLOQUEO%' OR tipo = 'BLOQUEO_SEGURIDAD_VISION');
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              type: reduce
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              expression: B
+              type: threshold
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+              refId: C
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: 'Intrusión o presencia de objeto extraño detectada en cámara de incubación'
+          description: 'El módulo de visión por computadora detectó un objeto no autorizado al inicio/durante el ciclo. El sistema activó alarma sonora y bloqueo general de actuadores.'
+        labels:
+          severity: critical
+          nodo_id: SE-01
+          capa: vision
+
+      - uid: alert-anomalia-ml
+        title: '[SmartEgg] ALERTA - Deteccion de Anomalia Predictiva (ML)'
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: smartegg-postgres
+            model:
+              editorMode: code
+              format: table
+              rawQuery: true
+              rawSql: >
+                SELECT COUNT(*) AS count
+                FROM registro_anomalias_ml
+                WHERE nodo_id = 'SE-01'
+                  AND es_anomalia = true
+                  AND timestamp > NOW() - INTERVAL '1 minute';
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              type: reduce
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              expression: B
+              type: threshold
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+              refId: C
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: 'Comportamiento predictivo anómalo en incubadora'
+          description: 'El modelo Isolation Forest ha detectado una desviación multidimensional persistente en temperatura/humedad.'
+        labels:
+          severity: warning
+          nodo_id: SE-01
+          capa: ml
+
+      - uid: alert-sobreconsumo-electrico
+        title: '[SmartEgg] ALERTA - Sobreconsumo Electrico Anomalo (>80W)'
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: smartegg-postgres
+            model:
+              editorMode: code
+              format: table
+              rawQuery: true
+              rawSql: >
+                SELECT COALESCE(
+                  (SELECT potencia_watts FROM vista_mediciones_energia WHERE nodo_id = 'SE-01' ORDER BY timestamp DESC LIMIT 1),
+                  0.0
+                ) AS potencia;
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              type: reduce
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              expression: B
+              type: threshold
+              conditions:
+                - evaluator:
+                    params:
+                      - 80.0
+                    type: gt
+              refId: C
+        noDataState: OK
+        execErrState: Error
+        for: 10s
+        annotations:
+          summary: 'Potencia eléctrica por encima del umbral seguro (80W)'
+          description: 'La incubadora excede la potencia máxima justificada de operación nominal (foco + ventilador simultáneos sostenidos o cortocircuito).'
+        labels:
+          severity: warning
+          nodo_id: SE-01
+          capa: energia
+
