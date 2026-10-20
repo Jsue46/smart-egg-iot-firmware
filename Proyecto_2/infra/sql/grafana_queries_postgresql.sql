@@ -86,3 +86,53 @@ WHERE ap.nodo_id = '${node_id}'
   AND $__timeFilter(ap."timestamp")
 GROUP BY date_trunc('day', ap."timestamp")
 ORDER BY "time";
+
+-- Q7 - Consumo energetico diario acumulado (Fase 3).
+SELECT
+    date_trunc('day', me.timestamp) AS "time",
+    ROUND(SUM(me.consumo_kwh)::numeric, 4) AS "Energía consumida (kWh)"
+FROM vista_mediciones_energia AS me
+WHERE $__timeFilter(me.timestamp)
+  AND me.nodo_id = '${node_id}'
+GROUP BY 1
+ORDER BY 1;
+
+-- Q8 - Potencia promedio horaria (Watts) (Fase 3).
+SELECT
+    date_trunc('hour', me.timestamp) AS "time",
+    ROUND(AVG(me.potencia_watts)::numeric, 2) AS "Potencia Promedio (W)"
+FROM vista_mediciones_energia AS me
+WHERE $__timeFilter(me.timestamp)
+  AND me.nodo_id = '${node_id}'
+GROUP BY 1
+ORDER BY 1;
+
+-- Q9 - Historico de anomalias detectadas por Machine Learning (Fase 3).
+SELECT
+    timestamp AS "time",
+    temperatura AS "Temp (°C)",
+    humedad AS "Humedad (%)",
+    ROUND(score_anomalia::numeric, 4) AS "Score ML",
+    detalle AS "Diagnóstico"
+FROM vista_registro_anomalias_ml
+WHERE es_anomalia = true
+  AND nodo_id = '${node_id}'
+  AND $__timeFilter(timestamp)
+ORDER BY timestamp DESC
+LIMIT 50;
+
+-- Q10 - Auditoria de eventos de bloqueo por Vision Computacional (Fase 3).
+SELECT
+    timestamp AS "time",
+    nodo_id AS "Nodo",
+    objeto_detectado AS "Clase Detectada",
+    ROUND(confianza::numeric, 1) AS "Confianza (%)",
+    estado_bloqueo AS "Estado",
+    motivo AS "Motivo",
+    ROUND(duracion_bloqueo_segundos::numeric, 1) AS "Duración Bloqueo (s)"
+FROM vista_eventos_vision
+WHERE nodo_id = '${node_id}'
+  AND $__timeFilter(timestamp)
+ORDER BY timestamp DESC
+LIMIT 50;
+
