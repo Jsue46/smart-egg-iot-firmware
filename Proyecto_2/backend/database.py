@@ -51,9 +51,12 @@ def get_connection():
 def execute(connection_or_cursor, query: str, params: Iterable[Any] = ()):
     """Execute SQL using the placeholder syntax of the active database."""
 
+    params_tuple = tuple(params)
     if USE_POSTGRES:
         query = query.replace("?", "%s")
-    return connection_or_cursor.execute(query, tuple(params))
+        if not params_tuple:
+            return connection_or_cursor.execute(query)
+    return connection_or_cursor.execute(query, params_tuple)
 
 
 POSTGRES_SCHEMA = (
@@ -207,7 +210,7 @@ POSTGRES_SCHEMA = (
            a.mensaje AS motivo, ROUND(EXTRACT(EPOCH FROM (COALESCE(a.resolucion_at, NOW()) - a.inicio_at))::numeric, 1) AS duracion_bloqueo_segundos,
            a.inicio_at AS timestamp
     FROM alarmas a
-    WHERE (a.tipo LIKE '%BLOQUEO%' OR a.tipo = 'BLOQUEO_SEGURIDAD_VISION') AND NOT EXISTS (SELECT 1 FROM eventos_seguridad_vision)
+    WHERE (a.tipo LIKE '%%BLOQUEO%%' OR a.tipo = 'BLOQUEO_SEGURIDAD_VISION') AND NOT EXISTS (SELECT 1 FROM eventos_seguridad_vision)
     """,
 )
 
