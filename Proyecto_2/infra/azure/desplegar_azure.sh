@@ -5,7 +5,7 @@
 set -euo pipefail
 
 RESOURCE_GROUP="rg-smartegg-arqui2"
-LOCATION="eastus"
+LOCATION="centralus"
 VM_NAME="vm-smartegg"
 VM_SIZE="Standard_B2s"
 ADMIN_USER="azureuser"

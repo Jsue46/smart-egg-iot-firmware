@@ -10,7 +10,7 @@
 
 param(
     [string]$ResourceGroup = "rg-smartegg-arqui2",
-    [string]$Location = "eastus",
+    [string]$Location = "centralus",
     [string]$VmName = "vm-smartegg",
     [string]$VmSize = "Standard_B2s", # 2 vCPU, 4GB RAM (~$0.04/hr, max rendimiento para Docker)
     [string]$AdminUser = "azureuser"
