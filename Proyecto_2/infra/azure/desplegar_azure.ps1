@@ -146,20 +146,24 @@ az storage account create `
     --sku Standard_LRS `
     --output none
 
+$StorageKey = (az storage account keys list --resource-group $ResourceGroup --account-name $StorageName --query "[0].value" --output tsv)
+
 # Habilitar sitio web estatico
 az storage blob service-properties update `
     --account-name $StorageName `
+    --account-key $StorageKey `
     --static-website `
     --index-document "index.html" `
     --output none
 
 # Subir dashboard p5.js inyectando la IP publica de la nube
 $p5Content = Get-Content -Path "dashboard_p5\index.html" -Raw
-$p5Content = $p5Content -replace 'let brokerHost = urlParams.get\(''host''\) \|\| window\.location\.hostname \|\| "localhost";', "let brokerHost = urlParams.get('host') || '$PublicIp';"
+$p5Content = $p5Content -replace "let brokerHost = urlParams.get\('host'\) \|\| window.location.hostname \|\| `"localhost`";", "let brokerHost = urlParams.get('host') || '$PublicIp';"
 Set-Content -Path "dashboard_p5\index_cloud.html" -Value $p5Content
 
 az storage blob upload `
     --account-name $StorageName `
+    --account-key $StorageKey `
     --container-name '$web' `
     --name "index.html" `
     --file "dashboard_p5\index_cloud.html" `
