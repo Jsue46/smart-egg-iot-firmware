@@ -9,10 +9,10 @@
 # ==============================================================================
 
 param(
-    [string]$ResourceGroup = "rg-smartegg-arqui2",
-    [string]$Location = "centralus",
+    [string]$ResourceGroup = "rg-smartegg-fase3",
+    [string]$Location = "northcentralus",
     [string]$VmName = "vm-smartegg",
-    [string]$VmSize = "Standard_B2s", # 2 vCPU, 4GB RAM (~$0.04/hr, max rendimiento para Docker)
+    [string]$VmSize = "Standard_B2as_v2", # AMD x86_64, 2 vCPU, 8GB RAM (~$0.04/hr, optimizado para Docker)
     [string]$AdminUser = "azureuser"
 )
 
@@ -85,53 +85,11 @@ Write-Host "-> Auto-apagado programado a las 11:00 PM (previene consumo de credi
 # 5. Instalar Docker y levantar el Stack en la VM remota
 Write-Host "`n[5/6] Instalando Docker y arrancando stack SmartEgg en la VM..." -ForegroundColor Yellow
 
-$CloudInitScript = @"
-#!/bin/bash
-set -e
-export DEBIAN_FRONTEND=noninteractive
-
-# Actualizar paquetes e instalar Docker
-apt-get update -y
-apt-get install -y ca-certificates curl gnupg git
-
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-chmod a+r /etc/apt/keyrings/docker.gpg
-
-echo "deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \$(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-apt-get update -y
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-usermod -aG docker azureuser
-
-# Clonar repositorio y levantar servicios
-mkdir -p /opt/smartegg
-cd /opt/smartegg
-git clone https://github.com/Jsue46/AYC2_G7.git repo
-cd repo/Proyecto_2
-git checkout fase3-completa || git checkout develop || true
-
-# Configurar variables con la IP publica detectada
-echo "NODE_ID=SE-01" > .env
-echo "MQTT_HOST=mosquitto" >> .env
-echo "MQTT_PORT=1883" >> .env
-echo "MQTT_WS_PORT=9001" >> .env
-echo "POSTGRES_DB=smartegg" >> .env
-echo "POSTGRES_USER=smartegg" >> .env
-echo "POSTGRES_PASSWORD=cambiar_esta_clave" >> .env
-echo "GRAFANA_ADMIN_USER=admin" >> .env
-echo "GRAFANA_ADMIN_PASSWORD=admin" >> .env
-
-docker compose up -d --build
-"@
-
-# Ejecutar el script dentro de la VM usando Run-Command
 az vm run-command invoke `
     --resource-group $ResourceGroup `
     --name $VmName `
     --command-id RunShellScript `
-    --scripts $CloudInitScript `
+    --scripts "@infra/azure/init_vm.sh" `
     --output none
 
 Write-Host "-> Stack Docker desplegado y en ejecucion en la nube." -ForegroundColor Green
