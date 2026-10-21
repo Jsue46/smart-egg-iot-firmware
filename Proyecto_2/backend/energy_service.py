@@ -208,6 +208,13 @@ def guardar_medicion_energia_db(datos: dict[str, Any]) -> None:
 def guardar_evento_vision_db(payload: dict[str, Any]) -> None:
     try:
         conn = get_connection()
+        clase = str(payload.get("clase") or payload.get("objeto") or payload.get("objeto_detectado") or "desconocido")
+        bloqueado = bool(payload.get("bloqueado") or payload.get("bloquear") or payload.get("bloqueo") or (clase == "objeto_extrano"))
+        conf = float(payload.get("confianza", 0.0))
+        conf_pct = conf * 100.0 if conf <= 1.0 else conf
+        motivo = str(payload.get("motivo") or payload.get("alerta") or "Deteccion de vision")
+        ts = payload.get("timestamp") or now_iso()
+
         execute(
             conn,
             """
@@ -217,16 +224,16 @@ def guardar_evento_vision_db(payload: dict[str, Any]) -> None:
             """,
             (
                 payload.get("nodo_id", NODE_ID),
-                str(payload.get("clase", "desconocido")),
-                float(payload.get("confianza", 0.0) * 100.0 if payload.get("confianza", 0) <= 1.0 else payload.get("confianza", 0.0)),
-                "BLOQUEADO" if payload.get("bloqueado") else "NORMAL",
-                str(payload.get("motivo", "")),
-                payload.get("timestamp") or now_iso(),
+                clase,
+                conf_pct,
+                "BLOQUEADO" if bloqueado else "NORMAL",
+                motivo,
+                ts,
             ),
         )
         conn.commit()
         conn.close()
-        LOGGER.info("Evento de vision registrado en base de datos: %s (bloqueado=%s)", payload.get("clase"), payload.get("bloqueado"))
+        LOGGER.info("Evento de vision registrado en base de datos: %s (bloqueado=%s)", clase, bloqueado)
     except Exception as e:
         LOGGER.warning("Error guardando evento de vision en BD: %s", e)
 
@@ -289,8 +296,10 @@ def main():
             if topic == T_ACTUADORES:
                 gestor.actualizar_actuadores(payload)
             elif topic == T_VISION:
-                gestor.actualizar_bloqueo(bool(payload.get("bloqueado", False)))
-                if payload.get("bloqueado") or payload.get("clase") == "objeto_extrano":
+                es_bloq = bool(payload.get("bloqueado") or payload.get("bloquear") or payload.get("bloqueo") or False)
+                gestor.actualizar_bloqueo(es_bloq)
+                clase_det = str(payload.get("clase") or payload.get("objeto") or payload.get("objeto_detectado") or "")
+                if es_bloq or clase_det == "objeto_extrano":
                     guardar_evento_vision_db(payload)
             elif topic == T_BLOQUEO:
                 gestor.actualizar_bloqueo(bool(payload.get("bloquear", payload.get("bloqueado", False))))
