@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from flask import Flask, jsonify, request, send_file  # type: ignore
 from flask_cors import CORS  # type: ignore
 
+import energy_service
 import serial_reader
 from database import execute, get_connection, init_db
 from mqtt_publisher import mqtt_publisher
@@ -38,6 +39,10 @@ def _startup() -> None:
     init_db()
     mqtt_publisher.start()
     serial_reader.iniciar_hilo_serial()
+    try:
+        energy_service.iniciar_hilo_energia()
+    except Exception as exc:
+        LOGGER.warning("No se pudo iniciar hilo de energia: %s", exc)
     LOGGER.info("Backend SmartEgg iniciado para el nodo %s", _node_id())
 
 

@@ -1,89 +1,189 @@
-# SmartEgg · Proyecto 1
+# SmartEgg: Incubadora Inteligente IoT — Fase 3
 
-Integración del sistema IoT de incubación: microcontrolador por serial, API Flask, PostgreSQL, Mosquitto, Grafana y frontend Next.js.
+**Universidad de San Carlos de Guatemala**  
+Facultad de Ingeniería — Escuela de Ciencias y Sistemas  
+Arquitectura de Computadores y Ensambladores 2 (Segundo Semestre 2026)  
+Catedrático: Ing. Gabriel Alejandro Díaz  
+Auxiliares: Josue Antonio Cux Barrientos, Marcos Geovani Josías Pérez Secay  
 
-## Arranque con Docker
+---
 
-Desde esta carpeta:
+## 📋 Resumen del Proyecto
 
-```powershell
-Copy-Item .env.example .env
-docker compose up -d --build
-docker compose ps
+La **Fase 3 de SmartEgg** consolida la evolución de una incubadora IoT tradicional hacia una plataforma inteligente y autónoma, cerrando las tres brechas operativas críticas identificadas en la Fase 2:
+1. **Percepción Visual Inteligente (OpenCV + ML):** Reconocimiento en tiempo real del contenido de la cabina (`huevo`, `objeto_extrano`, `vacio`). Si se inicia un ciclo y la cámara detecta un objeto no autorizado, se activa la alarma física y el sistema se bloquea por completo.
+2. **Análisis Predictivo de Fallas (Isolation Forest):** Detección temprana de anomalías térmicas y de humedad antes de que ocurran fallas críticas o mortandad embrionaria.
+3. **Gestión Inteligente de Energía Eléctrica:** Medición y cálculo de potencia instantánea (Watts) y consumo acumulado (kWh), temporizadores de corte y límites de potencia.
+4. **Despliegue y Observabilidad en la Nube (Microsoft Azure):** Despliegue en VM Linux con Docker Compose (Mosquitto MQTT, PostgreSQL, Grafana, ML Service, Backend) y hosting estático del Dashboard interactivo p5.js en Azure Blob Storage.
+
+---
+
+## 🛠️ Arquitectura y Capas del Framework IoT
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                             CAPA DE APLICACIÓN                              │
+│   • Dashboard Grafana Cloud (Métricas en tiempo real e históricas)          │
+│   • Dashboard Interactivo p5.js (Azure Blob Storage - MQTT WebSockets 9001)  │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ MQTT / WebSockets
+┌──────────────────────────────────────▼──────────────────────────────────────┐
+│                    CAPA DE PROCESAMIENTO Y SERVICIOS                        │
+│   • Broker MQTT Eclipse Mosquitto (Puerto 1883 TCP / 9001 WS)                │
+│   • Servicio de Detección de Anomalías ML (Isolation Forest - scikit-learn) │
+│   • Servicio de Gestión Energética y Persistencia (Flask / psycopg3)        │
+│   • Base de Datos Relacional PostgreSQL 16 (Esquema + Vistas Fase 3)        │
+└──────────────────────────────────────▲──────────────────────────────────────┘
+                                       │ MQTT TCP (Internet / Red Local)
+┌──────────────────────────────────────┴──────────────────────────────────────┐
+│                         CAPA DE RED Y ENLACE (EDGE)                         │
+│   • Túnel Serial <-> MQTT (backend/serial_bridge.py)                        │
+│   • Módulo de Visión Computacional OpenCV en Vivo (vision/detector_vision.py)│
+└──────────────────────────────────────▲──────────────────────────────────────┘
+                                       │ UART Serial / Video USB (Iriun)
+┌──────────────────────────────────────┴──────────────────────────────────────┐
+│                            CAPA DE PERCEPCIÓN                               │
+│   • Nodo Físico Arduino Mega 2560 (DHT11, Servomotor, Lector RFID RC522)    │
+│   • Actuadores: Foco Calefactor (Relé), Ventilador DC 12V, Buzzer Alarma    │
+│   • Señalización Luminosa de Bloqueo (LED Pin 13) y Pantalla LCD 16x2 I2C   │
+│   • Cámara de Inspección Interna (Smartphone / Iriun Webcam / USB)          │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Servicios publicados en el equipo:
+---
 
-| Servicio | URL/puerto |
-| --- | --- |
-| Frontend | http://localhost:3001 |
-| API REST | http://localhost:5000 |
-| Grafana | http://localhost:3000 (`admin` / `admin`) |
-| MQTT TCP | `localhost:1883` |
-| MQTT WebSocket | `ws://localhost:9001` |
-| PostgreSQL | `localhost:5432` |
+## ⚙️ Manual Técnico
 
-El backend usa `SIMULATE_TELEMETRY=false` por defecto. Para probar el circuito completo sin Arduino, cambia temporalmente esa variable a `true` en `.env` y recrea el backend:
+### 1. Documentación de Tópicos MQTT (Comunicación Exclusiva)
+El control y monitoreo opera **exclusivamente mediante MQTT**, eliminando APIs intermediarias para el flujo de telemetría y actuación.
 
+| Tópico | QoS | Retained | Payload JSON | Propósito |
+| :--- | :---: | :---: | :--- | :--- |
+| `smartegg/SE-01/status` | 1 | Sí | `{"nodo_id":"SE-01","estado":"online","valor":1,"timestamp":"..."}` | Disponibilidad y Last Will (LWT = offline). |
+| `smartegg/SE-01/sensores/temperatura` | 0 | No | `{"nodo_id":"SE-01","valor":37.5,"unidad":"°C","timestamp":"..."}` | Lecturas térmicas en vivo. |
+| `smartegg/SE-01/sensores/humedad` | 0 | No | `{"nodo_id":"SE-01","valor":58.0,"unidad":"%","timestamp":"..."}` | Humedad relativa en vivo. |
+| `smartegg/SE-01/actuadores/estado` | 1 | Sí | `{"nodo_id":"SE-01","foco":"ON","ventilador":"OFF","rotacion_grados":45.0}` | Estado de relés y servomotor. |
+| `smartegg/SE-01/vision/estado` | 0 | No | `{"nodo_id":"SE-01","clase":"huevo","confianza":0.985,"bloqueado":false}` | Clasificación OpenCV en tiempo real. |
+| `smartegg/SE-01/control/bloqueo` | 1 | Sí | `{"nodo_id":"SE-01","bloquear":true,"motivo":"objeto_extrano_detectado"}` | Orden de bloqueo hacia el Arduino y dashboards. |
+| `smartegg/SE-01/ml/anomalia` | 1 | Sí | `{"nodo_id":"SE-01","anomalia":false,"score":-0.0125,"umbral":-0.0052}` | Inferencia predictiva de Isolation Forest. |
+| `smartegg/SE-01/energia/consumo` | 0 | No | `{"nodo_id":"SE-01","watts":68.5,"kwh":0.142,"limite_watts":80.0}` | Potencia instantánea y acumulación. |
+| `smartegg/SE-01/control/energia` | 1 | No | `{"limite_watts":85.0,"temporizador_minutos":30}` | Configuración dinámica de energía y timer. |
+| `smartegg/SE-01/alarmas/critica` | 1 | Sí | `{"id":"...","tipo":"BLOQUEO_SEGURIDAD_VISION","activa":true}` | Notificación de alarma crítica en Grafana. |
+
+---
+
+### 2. Base de Datos (Modelo Entidad-Relación y Tablas Fase 3)
+
+La base de datos relacional PostgreSQL almacena la serie temporal y las bitácoras forenses. En la Fase 3 se incorporan tres tablas principales y tres vistas analíticas:
+
+1. **`mediciones_energia`**: Registro temporal de potencia (Watts), energía (kWh), voltaje (120V) y corriente (Amperios) por componente.
+2. **`registro_anomalias_ml`**: Historial de inferencias predictivas emitidas por el modelo `Isolation Forest`, puntuaciones atípicas y etiquetas de desviación.
+3. **`eventos_seguridad_vision`**: Bitácora de incidentes visuales, tipo de objeto invasor, porcentaje de confianza y duración del estado de bloqueo.
+
+#### Consultas SQL de Calificación (Auditoría Forense):
+
+* **Consultar últimas mediciones de consumo energético:**
+  ```sql
+  SELECT timestamp, potencia_watts, consumo_kwh, foco_watts, ventilador_watts
+  FROM mediciones_energia
+  WHERE nodo_id = 'SE-01'
+  ORDER BY timestamp DESC LIMIT 10;
+  ```
+
+* **Consultar incidentes de bloqueo por visión artificial:**
+  ```sql
+  SELECT timestamp, objeto_detectado, confianza, estado_bloqueo, motivo
+  FROM eventos_seguridad_vision
+  WHERE nodo_id = 'SE-01'
+  ORDER BY timestamp DESC;
+  ```
+
+* **Consultar anomalías predictivas detectadas por Machine Learning:**
+  ```sql
+  SELECT timestamp, temperatura, humedad, score_anomalia, umbral, detalle
+  FROM registro_anomalias_ml
+  WHERE es_anomalia = true
+  ORDER BY timestamp DESC;
+  ```
+
+---
+
+### 3. Justificación Técnica del Consumo Eléctrico
+
+Los valores de potencia y energía se sustentan en especificaciones físicas de componentes de incubación avícola:
+* **Foco calefactor incandescente:** $60.0\text{ W}$ (cuando el relé está cerrado en modo calentamiento).
+* **Ventilador DC 12V / 0.4A:** $5.0\text{ W}$ (conmutado por MOSFET o transistor).
+* **Servomotor SG90 / MG996R (volteo):** $2.5\text{ W}$ en rotación activa ($0.5\text{ W}$ en reposo).
+* **Consumo base de electrónica (Arduino, sensores, LEDs, LCD):** $3.0\text{ W}$ constantes.
+* **Potencia Total Nominal Activa:** $60.0 + 5.0 + 2.5 + 3.0 = 70.5\text{ W}$.
+* **Consumo Energético Integrado:** $\text{kWh} = \sum \frac{P_i \times \Delta t}{3600 \times 1000}$.
+* **Umbral de Alerta por Sobreconsumo:** $80.0\text{ W}$ (indica falla en relé, cortocircuito o activación simultánea de cargas no autorizadas).
+
+---
+
+### 4. Justificación del Valor Disruptivo
+El **bloqueo automático de bioseguridad mediante visión computacional** constituye el valor disruptivo del sistema. A diferencia de incubadoras comerciales que operan a ciegas confiando únicamente en la telemetría numérica, SmartEgg detecta objetos extraños, herramientas olvidadas o plagas dentro del nido, cortando de inmediato la energía de calefacción para evitar incendios o contaminación biológica.
+
+---
+
+## 💻 Manual de Usuario
+
+### 1. Interpretación del Dashboard en Grafana
+* Acceso: `http://<IP_AZURE>:3000` (Usuario: `admin` / Clave: `admin`).
+* **Panel de Temperatura y Humedad:** Muestra gráficas temporales con umbrales verde (óptimo 37.5°C), amarillo y rojo.
+* **Panel de Visión y Seguridad:** Muestra la insignia del estado actual (`HUEVO` o `BLOQUEADO`).
+* **Panel de Anomalías Predictivas:** Gráfica del score de `Isolation Forest`; si el score supera `-0.0052`, se resalta en rojo.
+* **Panel de Consumo Energético:** Gráfico de Watts y totalizador de kWh acumulados.
+* **Campana de Alertas:** Notifica eventos de `alert-bloqueo-vision-objeto` y `alert-sobreconsumo-electrico`.
+
+### 2. Uso del Dashboard Interactivo en p5.js
+* Acceso: Hospedado en Azure Blob Storage (o `frontend/public/visualizacion_p5.html`).
+* **Cabina Virtual:** Modelo 2D/3D donde el plato gira en el ángulo exacto del servo físico, el foco emite halos dorados al encender y el ventilador rota según los datos MQTT.
+* **Control de Potencia:** Slider interactivo para ajustar el límite de corte de energía (50W - 150W).
+* **Temporizador:** Botón para fijar ciclos de conexión eléctrica programada.
+* **Reacción de Bloqueo:** Si ocurre un bloqueo, la interfaz despliega una pantalla de alarma roja con el motivo del incidente y un botón seguro de **Desbloqueo**.
+
+---
+
+## 🚀 Guía de Puesta en Marcha
+
+### A. Despliegue en Microsoft Azure (Nube)
+Desde PowerShell en la carpeta raíz del proyecto:
 ```powershell
-docker compose up -d --force-recreate backend
-Invoke-RestMethod http://localhost:5000/health | ConvertTo-Json
+.\infra\azure\desplegar_azure.ps1
 ```
+El script creará automáticamente el Resource Group, la VM Ubuntu (`Standard_B2s`), las reglas de firewall, el auto-apagado de ahorro de créditos a las 23:00 hrs, levantará el stack Docker Compose y desplegará el dashboard p5.js en Azure Blob Storage.
 
-Para hardware real, deja el simulador en `false` y configura `SERIAL_PORT` si el puerto no puede detectarse automáticamente. El lector serial reintenta después de una desconexión y no reemplaza fallos reales con datos aleatorios.
+### B. Ejecución Local de la Maqueta y Cámara
 
-## Flujo integrado
+1. **Subir firmware a Arduino:**
+   * Abrir `firmware/firmware.ino` en Arduino IDE y subir a la placa Arduino Mega 2560.
+2. **Probar la cámara (Iriun Webcam):**
+   ```powershell
+   python vision/probar_camara.py
+   ```
+3. **Iniciar el enlace Serial <-> Nube:**
+   ```powershell
+   python backend/serial_bridge.py --mqtt-host <IP_PUBLICA_AZURE>
+   ```
+4. **Iniciar el detector de Visión Artificial:**
+   ```powershell
+   python vision/detector_vision.py --mqtt-host <IP_PUBLICA_AZURE>
+   ```
 
-1. El microcontrolador envía una línea JSON por UART a 9600 baudios.
-2. Flask valida la lectura, la guarda en PostgreSQL y abre/cierra intervalos de alarma.
-3. El publicador MQTT envía telemetría, actuadores y alarmas; mantiene `status=online` y configura LWT `offline`.
-4. Grafana usa MQTT para el dashboard en vivo y PostgreSQL para histórico.
-5. Next.js consume REST para lotes/histórico y MQTT.js por WebSocket para estado y alarmas sin refrescar.
+---
 
-Los timestamps se publican y almacenan en UTC/ISO 8601 para que todos los servicios compartan la misma referencia. Ambos dashboards tienen `timezone: browser`: Grafana convierte la fecha al huso horario local del navegador y, por tanto, del PC que los visualiza.
+## 🎤 Guion del Pitch de Presentación (5 Minutos)
 
-## Topics MQTT
-
-| Topic | QoS | Retained | Contenido |
-| --- | ---: | :---: | --- |
-| `smartegg/SE-01/sensores/temperatura` | 0 | No | `{valor, unidad, timestamp}` |
-| `smartegg/SE-01/sensores/humedad` | 0 | No | `{valor, unidad, timestamp}` |
-| `smartegg/SE-01/actuadores/estado` | 1 | Sí | `{foco, ventilador, rotacion_grados}` |
-| `smartegg/SE-01/alarmas/critica` | 1 | Sí | `{activa, tipo, severidad, inicio_at, resolucion_at}` |
-| `smartegg/SE-01/status` | 1 | Sí | `{estado, valor}`; `offline`/`valor=0` es el LWT |
-| `smartegg/SE-01/puerta/evento` | 1 | No | `{id, accion, operador_id, cantidad_huevos, timestamp}`; evento en vivo |
-
-La configuración del broker, pruebas y payloads completos están en [`infra/mqtt/README.md`](infra/mqtt/README.md).
-
-## Grafana
-
-Los dashboards se provisionan automáticamente:
-
-- `SmartEgg - Monitoreo MQTT en tiempo real`: temperatura, humedad, actuadores, rotación, alarma, status y último evento de puerta.
-- `SmartEgg - Analítica histórica`: tendencias, ocupación, min/max/promedio por lote, duración de alarmas y accesos de puerta.
-
-El dashboard en vivo usa una composición oscura tipo operación, series suaves con umbrales, KPIs de disponibilidad/alarma, estado de actuadores y rotación de la canasta. El histórico añade promedios, máximos/mínimos por lote, duración de alarmas y eventos de puerta. Las consultas SQL están en [`infra/sql/grafana_queries_postgresql.sql`](infra/sql/grafana_queries_postgresql.sql). El datasource MQTT es streaming y no almacena histórico; por eso los datos históricos se consultan en PostgreSQL.
-
-## API
-
-El contrato OpenAPI está en [`docs/openapi.yaml`](docs/openapi.yaml). Endpoints principales:
-
-## Video Demostrativo
-
-- [Ver Video Demostrativo de SmartEgg en Google Drive](https://drive.google.com/drive/folders/1w0q4TgvbBKzDrHfzG4wQCiI1_iPQEONU?usp=sharing)
-
-## Verificación rápida
-
-```powershell
-Invoke-RestMethod http://localhost:5000/health
-Invoke-RestMethod http://localhost:5000/datos
-docker compose exec mosquitto mosquitto_sub -h localhost -t 'smartegg/SE-01/#' -C 1 -W 10
-```
-
-Para detener la instalación:
-
-```powershell
-docker compose down
-```
-
-Los volúmenes `postgres_data`, `mosquitto_data` y `grafana_data` conservan la información entre reinicios. Solo usa `docker compose down -v` si quieres eliminar también esos datos de desarrollo.
+* **Minuto 0:00 - 1:00 (Problema y Oportunidad):**
+  *"En la industria avícola y biomédica, una falla térmica de 2 horas arruina miles de embriones. Pero peor aún: las incubadoras actuales son 'ciegas'; no saben si hay un huevo real o un objeto extraño que provoque un incendio. Presentamos SmartEgg IoT."*
+* **Minuto 1:00 - 2:00 (Arquitectura y Nube):**
+  *"SmartEgg combina un nodo físico local con despliegue en Microsoft Azure. Nuestra nube procesa telemetría MQTT sobre WebSockets, persiste en PostgreSQL y monitorea métricas en tiempo real en Grafana y en un dashboard interactivo en p5.js."*
+* **Minuto 2:00 - 3:30 (Demostración en Vivo — El momento 'WOW'):**
+  1. Mostrar la incubadora física operando con un huevo normal. En pantalla se observa `HUEVO (98.5% CONF)` y el foco calentando.
+  2. Retirar el huevo e introducir una tijera/llave/objeto extraño.
+  3. **Reacción inmediata:** En 200 ms la cámara OpenCV detecta `OBJETO EXTRAÑO`. Suena el buzzer físico, se enciende la luz de bloqueo, el foco se apaga y la pantalla de p5.js y Grafana entran en estado de bloqueo total.
+* **Minuto 3:30 - 4:30 (Inteligencia Predictiva y Energía):**
+  *"Demostramos nuestro modelo Isolation Forest previniendo desvíos térmicos sutiles y el gestor de consumo en Watts y kWh garantizando eficiencia energética."*
+* **Minuto 4:30 - 5:00 (Cierre y Preguntas):**
+  *"SmartEgg transforma la avicultura de una reacción tardía a una supervisión autónoma y predictiva. Quedamos a su disposición para la ronda de preguntas técnicas."*
