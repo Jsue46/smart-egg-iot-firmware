@@ -47,4 +47,9 @@ export interface TelemetryState {
   lots: Lot[];
   alarms: Alarm[];
   technician: Technician;
+  visionClass?: string;
+  visionConfidence?: number;
+  isVisionLocked?: boolean;
+  powerWatts?: number;
+  energyKwh?: number;
 }

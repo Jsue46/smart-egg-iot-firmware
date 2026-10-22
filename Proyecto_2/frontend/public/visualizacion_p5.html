@@ -2,392 +2,936 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>SmartEgg — Visualización Interactiva p5.js</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartEgg IoT — Dashboard Interactivo p5.js</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 <style>
   :root {
-    --bg-page: #ffffff;
-    --card-bg: rgba(255, 255, 255, 0.95);
-    --border-soft: #d8ded3;
-    --green-dark: #1e3d34;
-    --green-soft: #eaf5f0;
-    --alarm: #dc2626;
-    --text-main: #192e26;
-    --text-muted: #5f756b;
+    --bg: #0b0f19;
+    --card: rgba(18, 24, 38, 0.85);
+    --border: #1f293d;
+    --border-accent: #2e3d5b;
+    --accent-emerald: #10b981;
+    --accent-cyan: #06b6d4;
+    --accent-amber: #f59e0b;
+    --accent-rose: #f43f5e;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
   }
 
+  * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0;
     width: 100%; height: 100%;
-    background: #ffffff;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    overflow: hidden;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    overflow-x: hidden;
   }
 
-  #wrap {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
+  /* Barra superior */
+  header {
+    height: 60px;
+    background: rgba(11, 15, 25, 0.95);
+    border-bottom: 1px solid var(--border);
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(12px);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .brand-badge {
+    background: linear-gradient(135deg, #10b981, #06b6d4);
+    color: #fff;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .connection-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .mqtt-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    padding: 6px 14px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #34d399;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .mqtt-pill:hover {
+    background: rgba(16, 185, 129, 0.2);
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 10px #10b981;
+  }
+  .status-dot.disconnected {
+    background: #f43f5e;
+    box-shadow: 0 0 10px #f43f5e;
+  }
+
+  /* Grid principal */
+  .main-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 20px;
+    padding: 20px 24px;
+    max-width: 1600px;
+    margin: 0 auto;
+    min-height: calc(100vh - 60px);
+  }
+  @media (max-width: 1024px) {
+    .main-layout { grid-template-columns: 1fr; }
+  }
+
+  /* Canvas contenedor */
+  .canvas-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  }
+  .canvas-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .canvas-header h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  #canvas-container {
+    flex: 1;
+    min-height: 480px;
+    width: 100%;
+    position: relative;
+    background: radial-gradient(circle at center, #162032 0%, #0b0f19 75%);
+  }
+  canvas { display: block; margin: 0 auto; }
+
+  /* Panel lateral de tarjetas */
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .widget {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    backdrop-filter: blur(8px);
+  }
+  .widget-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* Metricas rapidas */
+  .metric-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .metric-box {
+    background: rgba(31, 41, 61, 0.5);
+    border: 1px solid var(--border-accent);
+    padding: 12px;
+    border-radius: 10px;
+  }
+  .metric-box .label { font-size: 11px; color: var(--text-muted); }
+  .metric-box .val { font-size: 24px; font-weight: 800; margin-top: 4px; font-family: monospace; }
+  .val-temp { color: #f59e0b; }
+  .val-hum { color: #06b6d4; }
+  .val-power { color: #10b981; }
+
+  /* Vision & ML Badges */
+  .badge-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(31, 41, 61, 0.4);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+  .badge-card:last-child { margin-bottom: 0; }
+  .badge-tag {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .tag-ok { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid #059669; }
+  .tag-warn { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid #d97706; }
+  .tag-danger { background: rgba(244, 63, 94, 0.2); color: #fda4af; border: 1px solid #e11d48; animation: pulseRed 1.5s infinite; }
+
+  @keyframes pulseRed {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(244, 63, 94, 0); }
+  }
+
+  /* Gestion de energia */
+  .energy-slider-group {
+    margin-top: 10px;
+  }
+  .energy-slider-group label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  input[type=range] {
+    width: 100%;
+    accent-color: #10b981;
+  }
+  .timer-control {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .btn {
+    background: rgba(31, 41, 61, 0.8);
+    border: 1px solid var(--border-accent);
+    color: var(--text-primary);
+    padding: 7px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn:hover { background: #2e3d5b; }
+  .btn-primary { background: #059669; border-color: #10b981; }
+  .btn-primary:hover { background: #10b981; }
+  .btn-danger { background: #dc2626; border-color: #f43f5e; }
+  .btn-danger:hover { background: #ef4444; }
+
+  /* OVERLAY DE BLOQUEO DE SEGURIDAD */
+  #lockOverlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(15, 6, 12, 0.94);
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: #ffffff;
+    backdrop-filter: blur(16px);
+    text-align: center;
+    padding: 20px;
+    animation: alertBorder 1s infinite alternate;
+  }
+  @keyframes alertBorder {
+    0% { box-shadow: inset 0 0 40px rgba(239, 68, 68, 0.4); }
+    100% { box-shadow: inset 0 0 100px rgba(239, 68, 68, 0.85); }
+  }
+  .lock-box {
+    background: #18080c;
+    border: 2px solid #ef4444;
+    border-radius: 20px;
+    padding: 40px;
+    max-width: 580px;
+    width: 100%;
+    box-shadow: 0 0 60px rgba(239, 68, 68, 0.4);
+  }
+  .lock-icon {
+    font-size: 54px;
+    margin-bottom: 12px;
+  }
+  .lock-title {
+    font-size: 24px;
+    font-weight: 800;
+    color: #fca5a5;
+    margin: 0 0 10px 0;
+    letter-spacing: -0.5px;
+  }
+  .lock-desc {
+    color: #cbd5e1;
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 24px;
   }
 
-  canvas {
-    display: block;
-  }
-
-  #hud {
-    position: absolute;
-    bottom: 12px;
-    left: 12px;
-    background: var(--card-bg);
-    border: 1px solid var(--border-soft);
-    border-radius: 8px;
-    padding: 6px 10px;
-    font-size: 11px;
-    line-height: 1.3;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    backdrop-filter: blur(6px);
-    z-index: 5;
-  }
-  #hud .row { display: flex; justify-content: space-between; gap: 8px; }
-  #hud .label { color: var(--text-muted); font-weight: 500; font-size: 10px; }
-  #hud .value { color: var(--green-dark); font-weight: 700; font-family: monospace; font-size: 11px; }
-  #hud .badge {
-    display: inline-block; margin-top: 4px;
-    padding: 2px 6px; border-radius: 4px;
-    font-size: 9px; letter-spacing: 0.2px;
-    background: var(--green-soft); color: var(--green-dark);
-    border: 1px solid #bbf0dc;
-    font-weight: 600;
-  }
-
-  #statusPill {
-    position: absolute;
-    bottom: 12px;
-    right: 12px;
-    background: var(--card-bg);
-    border: 1px solid var(--border-soft);
-    border-radius: 6px;
-    padding: 5px 10px;
-    font-size: 10.5px;
-    font-weight: 600;
-    color: var(--green-dark);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    z-index: 5;
-  }
-  #statusPill .dot {
-    width: 6.5px; height: 6.5px;
-    background: #10b981;
-    border-radius: 50%;
-  }
-
-  #alarmBanner {
-    position: absolute;
-    top: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #fef2f2;
-    color: #991b1b;
-    border: 1px solid #fecaca;
-    padding: 4px 12px;
-    border-radius: 9999px;
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.08);
+  /* Modal de configuracion */
+  #configModal {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.7);
     display: none;
+    justify-content: center;
     align-items: center;
-    gap: 6px;
-    z-index: 10;
-    white-space: nowrap;
+    z-index: 200;
   }
-  #alarmBanner .alarm-dot {
-    width: 6px;
-    height: 6px;
-    background: #ef4444;
-    border-radius: 50%;
+  .modal-box {
+    background: #131c2e;
+    border: 1px solid var(--border-accent);
+    border-radius: 14px;
+    padding: 24px;
+    max-width: 420px;
+    width: 90%;
+  }
+  .input-field {
+    width: 100%;
+    padding: 8px 12px;
+    background: #0b0f19;
+    border: 1px solid var(--border);
+    color: #fff;
+    border-radius: 6px;
+    margin-top: 6px;
+    margin-bottom: 14px;
   }
 </style>
 </head>
 <body>
-<div id="wrap">
-  <div id="alarmBanner">
-    <span class="alarm-dot"></span>
-    Alerta: condición crítica detectada
+
+<header>
+  <div class="brand">
+    <span>🥚</span>
+    <span>SmartEgg <span style="color:#06b6d4;">IoT</span></span>
+    <span class="brand-badge">FASE 3 — p5.js</span>
+  </div>
+  <div class="connection-bar">
+    <div class="mqtt-pill" id="mqttStatusBtn" onclick="abrirConfigModal()">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">MQTT Conectando...</span>
+    </div>
+  </div>
+</header>
+
+<div class="main-layout">
+  <!-- Area del Canvas Interactivo p5.js -->
+  <div class="canvas-card">
+    <div class="canvas-header">
+      <h2>Cabina de Incubación Virtual en Tiempo Real</h2>
+      <span style="font-size: 12px; color: var(--text-muted);" id="rotacionLabel">Rotación: 45°</span>
+    </div>
+    <div id="canvas-container"></div>
   </div>
 
-  <div id="hud">
-    <div class="row">
-      <span class="label">Foco / Fan:</span>
-      <span class="value" id="hudActuadores">-- / --</span>
+  <!-- Sidebar de Controles y Sensores -->
+  <div class="sidebar">
+    <!-- Telemetria Rapida -->
+    <div class="widget">
+      <div class="widget-title">Sensores Ambientales</div>
+      <div class="metric-row">
+        <div class="metric-box">
+          <div class="label">Temperatura</div>
+          <div class="val val-temp" id="valTemp">37.5°C</div>
+        </div>
+        <div class="metric-box">
+          <div class="label">Humedad</div>
+          <div class="val val-hum" id="valHum">58%</div>
+        </div>
+      </div>
     </div>
-    <div class="row">
-      <span class="label">Rotación:</span>
-      <span class="value" id="hudRotacion">--°</span>
-    </div>
-    <div class="badge">NODO SE-01</div>
-  </div>
 
-  <div id="statusPill">
-    <span class="dot" id="apiDot"></span><span id="apiLabel">API en Vivo</span>
+    <!-- Modulo de Vision por Computadora -->
+    <div class="widget">
+      <div class="widget-title">Visión IA (OpenCV)</div>
+      <div class="badge-card">
+        <div>
+          <div style="font-size:11px; color:var(--text-muted);">Clasificación del nido:</div>
+          <div style="font-weight:700; font-size:15px; margin-top:2px;" id="visionClase">HUEVO</div>
+        </div>
+        <span class="badge-tag tag-ok" id="visionTag">98.5% CONF</span>
+      </div>
+      <div style="font-size:11px; color:var(--text-secondary); margin-top:6px;" id="visionDetalle">
+        Vigilancia activa: objeto biológico verificado.
+      </div>
+    </div>
+
+    <!-- Modulo de Deteccion de Anomalias ML -->
+    <div class="widget">
+      <div class="widget-title">Detección de Anomalías (ML)</div>
+      <div class="badge-card">
+        <div>
+          <div style="font-size:11px; color:var(--text-muted);">Estado del Sistema:</div>
+          <div style="font-weight:700; font-size:15px; margin-top:2px;" id="mlEstado">NORMAL</div>
+        </div>
+        <span class="badge-tag tag-ok" id="mlTag">Isolation Forest</span>
+      </div>
+      <div style="font-size:11px; color:var(--text-secondary); margin-top:6px;" id="mlDetalle">
+        Score: -0.012 (dentro del rango seguro).
+      </div>
+    </div>
+
+    <!-- Gestion Inteligente de Consumo Electrico -->
+    <div class="widget">
+      <div class="widget-title">Gestión de Energía Eléctrica</div>
+      <div class="metric-row">
+        <div class="metric-box">
+          <div class="label">Potencia en Vivo</div>
+          <div class="val val-power" id="valWatts">68.5 W</div>
+        </div>
+        <div class="metric-box">
+          <div class="label">Energía Acumulada</div>
+          <div class="val" style="color:#a78bfa;" id="valKwh">0.142 kWh</div>
+        </div>
+      </div>
+
+      <div class="energy-slider-group">
+        <label>
+          <span>Límite de Potencia:</span>
+          <span id="labelLimitWatts" style="font-weight:700; color:#10b981;">80 W</span>
+        </label>
+        <input type="range" id="sliderLimit" min="40" max="150" value="80" oninput="cambiarLimiteEnergia(this.value)">
+      </div>
+
+      <div class="timer-control">
+        <button class="btn btn-primary" onclick="programarTemporizador(30)">⏱ Temporizador 30 min</button>
+        <button class="btn" onclick="programarTemporizador(0)">Cancelar</button>
+      </div>
+      <div id="timerStatus" style="font-size:11px; color:var(--text-muted); margin-top:6px;">
+        Temporizador: inactivo
+      </div>
+    </div>
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<!-- Modal de Bloqueo Critico -->
+<div id="lockOverlay">
+  <div class="lock-box">
+    <div class="lock-icon">🚨</div>
+    <h1 class="lock-title">¡SISTEMA BLOQUEADO!</h1>
+    <div class="lock-desc" id="lockMessage">
+      Se ha detectado un <strong>OBJETO EXTRAÑO</strong> dentro de la incubadora mientras el ciclo estaba en ejecución.
+      Por protocolos de bioseguridad, el calefactor y ventilador han sido apagados y la alarma física ha sido accionada.
+    </div>
+    <div style="margin-bottom: 20px;">
+      <span class="badge-tag tag-danger" style="font-size:13px; padding:6px 14px;">ESTADO: BLOQUEO DE SEGURIDAD ACTIVO</span>
+    </div>
+    <button class="btn btn-danger" style="font-size:15px; padding:12px 28px;" onclick="enviarDesbloqueo()">
+      🔓 Restablecer y Desbloquear Sistema
+    </button>
+  </div>
+</div>
+
+<!-- Modal de Configuracion Broker MQTT -->
+<div id="configModal">
+  <div class="modal-box">
+    <h3 style="margin-top:0;">Configuración Broker MQTT (WebSockets)</h3>
+    <p style="font-size:12px; color:var(--text-secondary);">
+      Ingresa la IP o Host de tu servidor (ej. la IP pública de AWS/Azure o localhost):
+    </p>
+    <label style="font-size:12px;">Host / IP:</label>
+    <input type="text" id="mqttHostInput" class="input-field" value="localhost">
+    <label style="font-size:12px;">Puerto WebSockets:</label>
+    <input type="number" id="mqttPortInput" class="input-field" value="9001">
+    <div style="display:flex; justify-content:flex-end; gap:8px;">
+      <button class="btn" onclick="cerrarConfigModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarConfigYReconectar()">Conectar</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const state = {
+// =========================================================================
+// 1. ESTADO GLOBAL DE LA APLICACION (100% MQTT, 0% REST)
+// =========================================================================
+const appState = {
+  nodoId: "SE-01",
   temperatura: 37.5,
   humedad: 58.0,
-  servo_ang: 0,
+  foco: "ON",
+  ventilador: "OFF",
+  rotacion: 45.0,
   espacios_libres: 1,
-  huevos_count: 2,
-  foco: "OFF",
-  fan: "OFF",
-  alarma: false,
-  api_online: true
+  
+  // Vision
+  vision_clase: "huevo",
+  vision_confianza: 0.985,
+  bloqueado: false,
+  
+  // ML
+  ml_anomalia: false,
+  ml_score: -0.0125,
+  
+  // Energia
+  watts: 68.5,
+  kwh: 0.1420,
+  limite_watts: 80.0,
+  alerta_consumo: false,
+  temporizador_activo: false,
+  segundos_restantes: 0
 };
 
-const API_URL = "http://127.0.0.1:5000/datos";
+// =========================================================================
+// 2. CONEXION MQTT SOBRE WEBSOCKETS (Puerto 9001)
+// =========================================================================
+let mqttClient = null;
+const urlParams = new URLSearchParams(window.location.search);
+let brokerHost = urlParams.get('host') || window.location.hostname || "localhost";
+if (brokerHost === "" || brokerHost === "0.0.0.0") brokerHost = "localhost";
+let brokerPort = parseInt(urlParams.get('port') || "9001");
 
-setInterval(async () => {
+document.getElementById('mqttHostInput').value = brokerHost;
+document.getElementById('mqttPortInput').value = brokerPort;
+
+function conectarMQTT() {
+  const clientId = "p5js-smartegg-" + Math.random().toString(16).substring(2, 8);
+  console.log(`[MQTT WS] Conectando a ws://${brokerHost}:${brokerPort} como ${clientId}...`);
+  actualizarEstadoConexion("Conectando...", false);
+
   try {
-    const res = await fetch(API_URL);
-    if (res.ok) {
-      const data = await res.json();
-      state.api_online = true;
-      state.temperatura = parseFloat(data.temperatura) || state.temperatura;
-      state.humedad = parseFloat(data.humedad) || state.humedad;
-      state.espacios_libres = data.espacios_libres !== undefined ? data.espacios_libres : 1;
-      state.huevos_count = Math.max(0, 3 - state.espacios_libres);
-      state.foco = data.foco || (state.temperatura < 37.2 ? "ON" : "OFF");
-      state.fan = data.fan || (state.temperatura >= 38.0 ? "ON" : "OFF");
-      const restRotation = parseFloat(data.rotacion_grados ?? data.servo_ang);
-      if (Number.isFinite(restRotation)) state.servo_ang = restRotation;
-      state.alarma = data.alarma === 1 || data.alarma === true || state.temperatura >= 38.5;
-
-      actualizarHUD();
-    } else {
-      state.api_online = false;
-      actualizarHUD();
-    }
-  } catch (err) {
-    state.api_online = false;
-    actualizarHUD();
+    mqttClient = new Paho.MQTT.Client(brokerHost, brokerPort, "/ws", clientId);
+  } catch(e) {
+    mqttClient = new Paho.MQTT.Client(brokerHost, brokerPort, clientId);
   }
-}, 2000);
 
-function actualizarHUD() {
-  document.getElementById('hudActuadores').textContent = state.foco + ' / ' + state.fan;
-  document.getElementById('hudRotacion').textContent = state.servo_ang.toFixed(0) + '°';
-  document.getElementById('alarmBanner').style.display = state.alarma ? 'flex' : 'none';
-  document.getElementById('apiLabel').textContent = state.api_online ? 'API en Vivo' : 'API desconectada';
-  document.getElementById('apiDot').style.background = state.api_online ? '#10b981' : '#dc2626';
+  mqttClient.onConnectionLost = onConnectionLost;
+  mqttClient.onMessageArrived = onMessageArrived;
+
+  mqttClient.connect({
+    onSuccess: onConnectSuccess,
+    onFailure: onConnectFailure,
+    useSSL: window.location.protocol === "https:",
+    timeout: 5,
+    keepAliveInterval: 30
+  });
 }
 
+function onConnectSuccess() {
+  console.log("[MQTT WS] Conectado exitosamente.");
+  actualizarEstadoConexion("MQTT En Línea (" + brokerHost + ")", true);
+  
+  // Suscribirse a todos los topicos de telemetria y control de Fase 3
+  const topicos = [
+    `smartegg/${appState.nodoId}/status`,
+    `smartegg/${appState.nodoId}/sensores/temperatura`,
+    `smartegg/${appState.nodoId}/sensores/humedad`,
+    `smartegg/${appState.nodoId}/actuadores/estado`,
+    `smartegg/${appState.nodoId}/vision/estado`,
+    `smartegg/${appState.nodoId}/control/bloqueo`,
+    `smartegg/${appState.nodoId}/ml/anomalia`,
+    `smartegg/${appState.nodoId}/energia/consumo`,
+    `smartegg/${appState.nodoId}/alarmas/critica`
+  ];
+  topicos.forEach(t => mqttClient.subscribe(t));
+}
+
+function onConnectFailure(err) {
+  console.warn("[MQTT WS] Fallo de conexion:", err);
+  actualizarEstadoConexion("MQTT Error (clic p/ configurar)", false);
+  setTimeout(conectarMQTT, 5000);
+}
+
+function onConnectionLost(responseObject) {
+  if (responseObject.errorCode !== 0) {
+    console.warn("[MQTT WS] Conexion perdida:", responseObject.errorMessage);
+    actualizarEstadoConexion("MQTT Reconectando...", false);
+    setTimeout(conectarMQTT, 3000);
+  }
+}
+
+function onMessageArrived(message) {
+  try {
+    const topic = message.destinationName;
+    const payload = JSON.parse(message.payloadString);
+
+    if (topic.includes("temperatura")) {
+      appState.temperatura = parseFloat(payload.valor);
+    } else if (topic.includes("humedad")) {
+      appState.humedad = parseFloat(payload.valor);
+    } else if (topic.includes("actuadores/estado")) {
+      appState.foco = String(payload.foco || "OFF").toUpperCase();
+      appState.ventilador = String(payload.ventilador || payload.fan || "OFF").toUpperCase();
+      appState.rotacion = parseFloat(payload.rotacion_grados || 0);
+      appState.espacios_libres = parseInt(payload.espacios_libres !== undefined ? payload.espacios_libres : 1);
+    } else if (topic.includes("vision/estado")) {
+      appState.vision_clase = payload.clase || "huevo";
+      appState.vision_confianza = parseFloat(payload.confianza || 0.95);
+      appState.bloqueado = Boolean(payload.bloqueado);
+    } else if (topic.includes("control/bloqueo")) {
+      appState.bloqueado = Boolean(payload.bloquear !== undefined ? payload.bloquear : payload.bloqueado);
+    } else if (topic.includes("ml/anomalia")) {
+      appState.ml_anomalia = Boolean(payload.anomalia);
+      appState.ml_score = parseFloat(payload.score || 0);
+    } else if (topic.includes("energia/consumo")) {
+      appState.watts = parseFloat(payload.watts || payload.potencia || 0);
+      appState.kwh = parseFloat(payload.kwh || payload.consumo_kwh || 0);
+      appState.limite_watts = parseFloat(payload.limite_watts || 80);
+      appState.alerta_consumo = Boolean(payload.alerta_consumo);
+      if (payload.temporizador_activo !== undefined) {
+        appState.temporizador_activo = Boolean(payload.temporizador_activo);
+        appState.segundos_restantes = parseInt(payload.segundos_restantes || 0);
+      }
+    }
+
+    actualizarDOM();
+  } catch(e) {
+    console.error("Error parseando mensaje MQTT:", e);
+  }
+}
+
+function actualizarEstadoConexion(texto, conectado) {
+  document.getElementById('statusText').textContent = texto;
+  const dot = document.getElementById('statusDot');
+  if (conectado) {
+    dot.classList.remove('disconnected');
+  } else {
+    dot.classList.add('disconnected');
+  }
+}
+
+function actualizarDOM() {
+  document.getElementById('valTemp').textContent = appState.temperatura.toFixed(1) + "°C";
+  document.getElementById('valHum').textContent = appState.humedad.toFixed(0) + "%";
+  document.getElementById('rotacionLabel').textContent = "Rotación: " + appState.rotacion.toFixed(0) + "°";
+
+  // Vision
+  const visionClaseElem = document.getElementById('visionClase');
+  const visionTag = document.getElementById('visionTag');
+  visionClaseElem.textContent = appState.vision_clase.toUpperCase();
+  visionTag.textContent = (appState.vision_confianza * 100).toFixed(1) + "% CONF";
+  
+  if (appState.vision_clase === "huevo") {
+    visionTag.className = "badge-tag tag-ok";
+    document.getElementById('visionDetalle').textContent = "Vigilancia activa: huevo verificado en nido.";
+  } else if (appState.vision_clase === "objeto_extrano") {
+    visionTag.className = "badge-tag tag-danger";
+    document.getElementById('visionDetalle').textContent = "¡ALERTA! Objeto no autorizado detectado.";
+  } else {
+    visionTag.className = "badge-tag tag-warn";
+    document.getElementById('visionDetalle').textContent = "Compartimiento vacío o sin incubar.";
+  }
+
+  // ML
+  const mlEstado = document.getElementById('mlEstado');
+  const mlTag = document.getElementById('mlTag');
+  if (appState.ml_anomalia) {
+    mlEstado.textContent = "ANOMALÍA DETECTADA";
+    mlTag.className = "badge-tag tag-danger";
+    document.getElementById('mlDetalle').textContent = `Score atípico: ${appState.ml_score.toFixed(4)} (desviación térmica)`;
+  } else {
+    mlEstado.textContent = "NORMAL";
+    mlTag.className = "badge-tag tag-ok";
+    document.getElementById('mlDetalle').textContent = `Score: ${appState.ml_score.toFixed(4)} (dentro de umbral seguro)`;
+  }
+
+  // Energia
+  document.getElementById('valWatts').textContent = appState.watts.toFixed(1) + " W";
+  document.getElementById('valKwh').textContent = appState.kwh.toFixed(4) + " kWh";
+  if (appState.alerta_consumo) {
+    document.getElementById('valWatts').style.color = "#f43f5e";
+  } else {
+    document.getElementById('valWatts').style.color = "#10b981";
+  }
+
+  // Temporizador
+  if (appState.temporizador_activo && appState.segundos_restantes > 0) {
+    const mins = Math.floor(appState.segundos_restantes / 60);
+    const secs = appState.segundos_restantes % 60;
+    document.getElementById('timerStatus').textContent = `Temporizador activo: ${mins}m ${secs}s restantes`;
+    document.getElementById('timerStatus').style.color = "#38bdf8";
+  } else {
+    document.getElementById('timerStatus').textContent = "Temporizador: inactivo";
+    document.getElementById('timerStatus').style.color = "var(--text-muted)";
+  }
+
+  // Overlay de Bloqueo
+  const overlay = document.getElementById('lockOverlay');
+  if (appState.bloqueado) {
+    overlay.style.display = "flex";
+  } else {
+    overlay.style.display = "none";
+  }
+}
+
+function cambiarLimiteEnergia(val) {
+  document.getElementById('labelLimitWatts').textContent = val + " W";
+  if (mqttClient && mqttClient.isConnected()) {
+    const msg = new Paho.MQTT.Message(JSON.stringify({ limite_watts: parseFloat(val) }));
+    msg.destinationName = `smartegg/${appState.nodoId}/control/energia`;
+    mqttClient.send(msg);
+  }
+}
+
+function programarTemporizador(minutos) {
+  if (mqttClient && mqttClient.isConnected()) {
+    const msg = new Paho.MQTT.Message(JSON.stringify({ temporizador_minutos: minutos }));
+    msg.destinationName = `smartegg/${appState.nodoId}/control/energia`;
+    mqttClient.send(msg);
+  }
+}
+
+function enviarDesbloqueo() {
+  if (mqttClient && mqttClient.isConnected()) {
+    const msg = new Paho.MQTT.Message(JSON.stringify({ bloquear: false, motivo: "desbloqueo_p5js" }));
+    msg.destinationName = `smartegg/${appState.nodoId}/control/bloqueo`;
+    msg.retained = true;
+    msg.qos = 1;
+    mqttClient.send(msg);
+    appState.bloqueado = false;
+    actualizarDOM();
+  }
+}
+
+// Modal config
+function abrirConfigModal() { document.getElementById('configModal').style.display = 'flex'; }
+function cerrarConfigModal() { document.getElementById('configModal').style.display = 'none'; }
+function guardarConfigYReconectar() {
+  brokerHost = document.getElementById('mqttHostInput').value.trim();
+  brokerPort = parseInt(document.getElementById('mqttPortInput').value.trim());
+  cerrarConfigModal();
+  if (mqttClient) {
+    try { mqttClient.disconnect(); } catch(e){}
+  }
+  conectarMQTT();
+}
+
+// =========================================================================
+// 3. RENDERIZADO VISUAL CON p5.js
+// =========================================================================
 let particulas = [];
-const NUM_PARTICULAS = 75;
+const NUM_PARTICULAS = 60;
 
 function setup() {
-  const canvas = createCanvas(windowWidth, windowHeight);
-  canvas.parent('wrap');
+  const container = document.getElementById('canvas-container');
+  const w = container.clientWidth || 800;
+  const h = container.clientHeight || 520;
+  const canvas = createCanvas(w, h);
+  canvas.parent('canvas-container');
   angleMode(DEGREES);
 
   for (let i = 0; i < NUM_PARTICULAS; i++) {
     particulas.push({
-      rad: random(50, 225),
+      rad: random(40, 210),
       ang: random(360),
-      vel: random(0.2, 0.7),
-      tam: random(3.0, 6.0)
+      vel: random(0.2, 0.6),
+      tam: random(2.5, 5.0)
     });
   }
+
+  conectarMQTT();
 }
 
 function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-}
-
-function drawLamp(cx, cy, s) {
-  push();
-  translate(cx, cy - 165 * s);
-  rectMode(CENTER);
-  stroke(71, 85, 105);
-  strokeWeight(1.5 * s);
-  fill(30, 41, 59);
-  rect(0, -17 * s, 22 * s, 9 * s, 3 * s);
-
-  if (state.foco === "ON") {
-    noStroke();
-    for (let halo = 3; halo >= 1; halo--) {
-      fill(245, 158, 11, 16 + halo * 7);
-      ellipse(0, 0, (30 + halo * 17) * s, (30 + halo * 17) * s);
-    }
-    fill(255, 190, 54, 235 + 20 * sin(frameCount * 5));
-    stroke(255, 216, 106);
-    ellipse(0, 0, 27 * s, 27 * s);
-    noStroke();
-    fill(255, 249, 196, 190);
-    ellipse(-5 * s, -6 * s, 8 * s, 10 * s);
-  } else {
-    fill(51, 65, 85);
-    stroke(71, 85, 105);
-    ellipse(0, 0, 22 * s, 22 * s);
-  }
-  pop();
-}
-
-function drawFan(cx, cy, s) {
-  push();
-  translate(cx + 172 * s, cy - 4 * s);
-  rectMode(CENTER);
-  fill(30, 41, 59);
-  stroke(state.fan === "ON" ? color(56, 189, 248) : color(71, 85, 105));
-  strokeWeight(1.8 * s);
-  rect(0, 0, 30 * s, 70 * s, 8 * s);
-
-  stroke(100, 116, 139, 160);
-  noFill();
-  ellipse(0, 0, 42 * s, 42 * s);
-  push();
-  rotate(state.fan === "ON" ? frameCount * 9 : 0);
-  for (let i = 0; i < 4; i++) {
-    push();
-    rotate(i * 90);
-    fill(state.fan === "ON" ? color(154, 230, 255, 220) : color(66, 82, 103, 220));
-    noStroke();
-    beginShape();
-    vertex(0, -3 * s);
-    bezierVertex(5 * s, -18 * s, 17 * s, -17 * s, 16 * s, -6 * s);
-    bezierVertex(12 * s, 0, 6 * s, 1 * s, 0, 3 * s);
-    endShape(CLOSE);
-    pop();
-  }
-  fill(20, 34, 52);
-  stroke(148, 163, 184);
-  strokeWeight(1.2 * s);
-  ellipse(0, 0, 9 * s, 9 * s);
-  pop();
-  pop();
-}
-
-function drawAirflow(cx, cy, s) {
-  const active = state.fan === "ON";
-  const speed = active ? 1.8 : 0.45;
-  const humidityAlpha = constrain(map(state.humedad, 35, 75, 45, 120), 45, 120);
-  for (let i = 0; i < 5; i++) {
-    const phase = (frameCount * speed + i * 62) % 280;
-    const x = cx - 125 * s + phase * s;
-    const y = cy - 90 * s + i * 43 * s;
-    noFill();
-    stroke(56, 189, 248, active ? humidityAlpha : humidityAlpha * 0.55);
-    strokeWeight((active ? 1.4 : 0.9) * s);
-    arc(x, y, (54 + i * 5) * s, (22 + i * 3) * s, 200, 340);
+  const container = document.getElementById('canvas-container');
+  if (container) {
+    resizeCanvas(container.clientWidth, container.clientHeight);
   }
 }
 
 function draw() {
+  background(11, 15, 25);
+
   const cx = width / 2;
   const cy = height / 2;
+  const s = min(width, height) / 460;
 
-  const s = min(width, height) / 440;
-
-  background(255, 255, 255);
-
-  stroke(214, 211, 201);
-  strokeWeight(2 * s);
-  fill(248, 247, 242);
+  // 1. Chasis exterior de la incubadora
   rectMode(CENTER);
-  rect(cx, cy, 390 * s, 390 * s, 16 * s);
+  stroke(31, 41, 61);
+  strokeWeight(2.5 * s);
+  fill(18, 24, 38, 220);
+  rect(cx, cy, 390 * s, 390 * s, 24 * s);
 
+  // Cristal / Borde interior
+  stroke(46, 61, 91, 150);
+  strokeWeight(1.2 * s);
   noFill();
-  stroke(255, 255, 255, 180);
-  strokeWeight(1 * s);
-  rect(cx, cy, 376 * s, 376 * s, 13 * s);
+  rect(cx, cy, 368 * s, 368 * s, 18 * s);
 
-  const factorHumedad = map(state.humedad, 30, 85, 0.6, 2.0);
+  // 2. Particulas de humedad suspendidas en el aire
+  const factorHumedad = map(appState.humedad, 30, 85, 0.5, 2.2);
   for (let p of particulas) {
     p.ang += p.vel * factorHumedad;
     let px = cx + cos(p.ang) * (p.rad * s);
     let py = cy + sin(p.ang) * (p.rad * 0.75 * s);
 
     noStroke();
-    fill(2, 132, 199, 80);
-    circle(px, py, (p.tam + 3.0) * s);
-
-    fill(14, 165, 233, 240);
+    fill(6, 182, 212, 40);
+    circle(px, py, (p.tam + 4.0) * s);
+    fill(14, 165, 233, 190);
     circle(px, py, p.tam * s);
   }
 
-  drawAirflow(cx, cy, s);
-  drawLamp(cx, cy, s);
-  drawFan(cx, cy, s);
+  // 3. Foco Calefactor (Arriba)
+  drawBulb(cx, cy - 150 * s, s);
 
+  // 4. Ventilador (Derecha)
+  drawFan(cx + 155 * s, cy, s);
+
+  // 5. Bandeja Giratoria de Huevos (Centro)
   push();
   translate(cx, cy);
-  rotate(state.servo_ang);
+  rotate(appState.rotacion);
 
-  fill(2, 132, 199);
-  stroke(56, 189, 248);
-  strokeWeight(2.5 * s);
-  ellipse(0, 0, 240 * s, 240 * s);
-
-  noFill();
-  stroke(125, 211, 252, 135);
-  strokeWeight(1.3 * s);
-  ellipse(0, 0, 218 * s, 218 * s);
-
+  // Plato base
   fill(15, 23, 42);
+  stroke(appState.bloqueado ? color(244, 63, 94) : color(6, 182, 212));
+  strokeWeight(2.8 * s);
+  ellipse(0, 0, 220 * s, 220 * s);
+
+  // Aro interno
+  stroke(30, 41, 59);
+  strokeWeight(1.5 * s);
+  ellipse(0, 0, 190 * s, 190 * s);
+
+  // Eje central
+  fill(30, 41, 59);
   stroke(71, 85, 105);
   ellipse(0, 0, 36 * s, 36 * s);
 
-  const tNorm = map(state.temperatura, 32, 42, 0, 1);
+  // Posiciones de los 3 huevos
   const angulos = [-90, 30, 150];
-  for (let i = 0; i < 3; i++) {
-    const radioCavidad = 72 * s;
-    const hx = cos(angulos[i]) * radioCavidad;
-    const hy = sin(angulos[i]) * radioCavidad;
+  const huevosVisibles = Math.max(0, 3 - appState.espacios_libres);
 
-    if (i < state.huevos_count) {
+  for (let i = 0; i < 3; i++) {
+    const rad = 66 * s;
+    const hx = cos(angulos[i]) * rad;
+    const hy = sin(angulos[i]) * rad;
+
+    if (i < huevosVisibles) {
       push();
       translate(hx, hy);
-      rotate(-state.servo_ang);
+      rotate(-appState.rotacion); // mantener orientacion erguida
 
-      const colorHuevo = lerpColor(color(254, 240, 138), color(234, 88, 12), tNorm);
-      fill(colorHuevo);
-      stroke(180, 83, 9);
-      strokeWeight(1.8 * s);
-      ellipse(0, 0, 44 * s, 58 * s);
+      if (appState.vision_clase === "objeto_extrano" && i === 0) {
+        // Dibujar objeto extraño (bloque peligroso)
+        fill(244, 63, 94);
+        stroke(255, 255, 255);
+        strokeWeight(2 * s);
+        rect(0, 0, 38 * s, 38 * s, 6 * s);
+        fill(255);
+        textAlign(CENTER, CENTER);
+        textSize(16 * s);
+        text("⚠️", 0, 0);
+      } else {
+        // Huevo realista
+        const tNorm = map(appState.temperatura, 35, 40, 0, 1);
+        const colHuevo = lerpColor(color(254, 243, 199), color(245, 158, 11), tNorm);
+        fill(colHuevo);
+        stroke(180, 83, 9);
+        strokeWeight(1.8 * s);
+        ellipse(0, 0, 42 * s, 54 * s);
 
-      noStroke();
-      fill(255, 255, 255, 70);
-      ellipse(-7 * s, -11 * s, 11 * s, 16 * s);
+        // Brillo cascaron
+        noStroke();
+        fill(255, 255, 255, 80);
+        ellipse(-6 * s, -10 * s, 10 * s, 15 * s);
+      }
       pop();
     } else {
-      fill(15, 23, 42);
-      stroke(148, 163, 184);
-      strokeWeight(1.8 * s);
-      ellipse(hx, hy, 46 * s, 46 * s);
-
+      // Cavidad libre
+      fill(11, 15, 25);
+      stroke(51, 65, 85);
+      strokeWeight(1.5 * s);
+      ellipse(hx, hy, 44 * s, 44 * s);
       noStroke();
-      fill(100, 116, 139);
+      fill(71, 85, 105);
       textAlign(CENTER, CENTER);
       textSize(8.5 * s);
       text("LIBRE", hx, hy);
     }
   }
   pop();
+}
 
-  if (state.alarma) {
-    noFill();
-    let alfaRojo = 140 + 115 * sin(frameCount * 8);
-    stroke(220, 38, 38, alfaRojo);
-    strokeWeight(4.5 * s);
-    rect(cx, cy, 392 * s, 392 * s, 16 * s);
+function drawBulb(bx, by, s) {
+  push();
+  translate(bx, by);
+  rectMode(CENTER);
+
+  // Soporte
+  fill(30, 41, 59);
+  stroke(71, 85, 105);
+  strokeWeight(1.5 * s);
+  rect(0, -18 * s, 26 * s, 12 * s, 4 * s);
+
+  if (appState.foco === "ON" && !appState.bloqueado) {
+    // Halos calidos
+    noStroke();
+    for (let h = 3; h >= 1; h--) {
+      fill(245, 158, 11, 18 + h * 8);
+      ellipse(0, 0, (26 + h * 18) * s, (26 + h * 18) * s);
+    }
+    // Foco incandescente
+    fill(255, 190, 54, 240);
+    stroke(255, 216, 106);
+    strokeWeight(1.5 * s);
+    ellipse(0, 0, 26 * s, 26 * s);
+  } else {
+    fill(40, 50, 65);
+    stroke(71, 85, 105);
+    ellipse(0, 0, 22 * s, 22 * s);
   }
+  pop();
+}
+
+function drawFan(fx, fy, s) {
+  push();
+  translate(fx, fy);
+  rectMode(CENTER);
+
+  // Carcasa
+  fill(18, 24, 38);
+  stroke(appState.ventilador === "ON" ? color(6, 182, 212) : color(51, 65, 85));
+  strokeWeight(1.8 * s);
+  rect(0, 0, 28 * s, 72 * s, 8 * s);
+
+  // Aspas giratorias
+  push();
+  rotate(appState.ventilador === "ON" && !appState.bloqueado ? frameCount * 12 : 0);
+  for (let i = 0; i < 4; i++) {
+    push();
+    rotate(i * 90);
+    fill(appState.ventilador === "ON" ? color(56, 189, 248, 220) : color(51, 65, 85));
+    noStroke();
+    ellipse(0, -12 * s, 7 * s, 20 * s);
+    pop();
+  }
+  fill(15, 23, 42);
+  stroke(148, 163, 184);
+  ellipse(0, 0, 8 * s, 8 * s);
+  pop();
+  pop();
 }
 </script>
 </body>

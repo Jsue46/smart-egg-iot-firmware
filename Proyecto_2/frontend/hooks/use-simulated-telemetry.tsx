@@ -71,6 +71,11 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
   const [isPaused, setIsPaused] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
   const [isAlarm, setIsAlarm] = useState(false);
+  const [visionClass, setVisionClass] = useState("vacio");
+  const [visionConfidence, setVisionConfidence] = useState(0);
+  const [isVisionLocked, setIsVisionLocked] = useState(false);
+  const [powerWatts, setPowerWatts] = useState(3.5);
+  const [energyKwh, setEnergyKwh] = useState(0);
   const { user } = useAuth();
 
   const fetchData = useCallback(async () => {
@@ -174,6 +179,9 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
               `smartegg/${NODE_ID}/actuadores/estado`,
               `smartegg/${NODE_ID}/alarmas/critica`,
               `smartegg/${NODE_ID}/puerta/evento`,
+              `smartegg/${NODE_ID}/vision/estado`,
+              `smartegg/${NODE_ID}/control/bloqueo`,
+              `smartegg/${NODE_ID}/energia/consumo`,
             ],
             { qos: 0 },
           );
@@ -203,6 +211,22 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
               });
             } else if (topic.endsWith("/puerta/evento")) {
               setDoorOpen(doorIsOpen(payload.accion ?? payload.action));
+            } else if (topic.endsWith("/vision/estado")) {
+              setVisionClass(payload.clase ?? payload.objeto ?? "vacio");
+              setVisionConfidence(Number(payload.confianza) || 0);
+              if (payload.bloqueado === true) {
+                setIsVisionLocked(true);
+                setIsAlarm(true);
+              } else if (payload.bloqueado === false) {
+                setIsVisionLocked(false);
+              }
+            } else if (topic.endsWith("/control/bloqueo")) {
+              const bloq = Boolean(payload.bloquear ?? payload.bloqueado);
+              setIsVisionLocked(bloq);
+              if (bloq) setIsAlarm(true);
+            } else if (topic.endsWith("/energia/consumo")) {
+              if (Number.isFinite(Number(payload.potencia_watts))) setPowerWatts(Number(payload.potencia_watts));
+              if (Number.isFinite(Number(payload.consumo_kwh))) setEnergyKwh(Number(payload.consumo_kwh));
             }
           } catch {
             // Ignore non-JSON broker messages on the application topics.
@@ -276,11 +300,16 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       alarms,
       technician:
         user ? { name: user.name, id: user.badge, role: ROLE_LABELS[user.role] } : authenticatedTechnician,
+      visionClass,
+      visionConfidence,
+      isVisionLocked,
+      powerWatts,
+      energyKwh,
       addLot,
       togglePaused: () => setIsPaused((paused: boolean) => !paused),
       triggerDemoAlarm,
     }),
-    [addLot, alarms, doorOpen, fanOn, heaterOn, history, humidity, isAlarm, isOnline, isPaused, lots, occupied, servoAngle, temperature, triggerDemoAlarm, user],
+    [addLot, alarms, doorOpen, fanOn, heaterOn, history, humidity, isAlarm, isOnline, isPaused, lots, occupied, servoAngle, temperature, triggerDemoAlarm, user, visionClass, visionConfidence, isVisionLocked, powerWatts, energyKwh],
   );
 
   return <TelemetryContext.Provider value={value}>{children}</TelemetryContext.Provider>;

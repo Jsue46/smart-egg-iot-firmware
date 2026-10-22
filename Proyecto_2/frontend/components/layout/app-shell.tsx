@@ -18,6 +18,7 @@ import {
   MenuIcon,
   PlusEggIcon,
   ReportIcon,
+  RotationIcon,
   UserIcon,
 } from "@/components/icons/egg-icons";
 
@@ -76,6 +77,7 @@ function Navigation({ mobile = false, collapsed = false, items }: { mobile?: boo
 function PageTitle({ pathname }: { pathname: string }) {
   const titles: Record<string, string> = {
     "/dashboard": "Panel de incubación",
+    "/simulador": "Simulador interactivo y Visión AI (Fase 3)",
     "/reportes": "Reportes",
     "/lotes/nuevo": "Registrar lote",
     "/lotes": "Lotes",

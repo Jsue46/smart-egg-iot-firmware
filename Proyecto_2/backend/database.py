@@ -51,9 +51,12 @@ def get_connection():
 def execute(connection_or_cursor, query: str, params: Iterable[Any] = ()):
     """Execute SQL using the placeholder syntax of the active database."""
 
+    params_tuple = tuple(params)
     if USE_POSTGRES:
         query = query.replace("?", "%s")
-    return connection_or_cursor.execute(query, tuple(params))
+        if not params_tuple:
+            return connection_or_cursor.execute(query)
+    return connection_or_cursor.execute(query, params_tuple)
 
 
 POSTGRES_SCHEMA = (
@@ -207,7 +210,7 @@ POSTGRES_SCHEMA = (
            a.mensaje AS motivo, ROUND(EXTRACT(EPOCH FROM (COALESCE(a.resolucion_at, NOW()) - a.inicio_at))::numeric, 1) AS duracion_bloqueo_segundos,
            a.inicio_at AS timestamp
     FROM alarmas a
-    WHERE (a.tipo LIKE '%BLOQUEO%' OR a.tipo = 'BLOQUEO_SEGURIDAD_VISION') AND NOT EXISTS (SELECT 1 FROM eventos_seguridad_vision)
+    WHERE (a.tipo LIKE '%%BLOQUEO%%' OR a.tipo = 'BLOQUEO_SEGURIDAD_VISION') AND NOT EXISTS (SELECT 1 FROM eventos_seguridad_vision)
     """,
 )
 
@@ -292,6 +295,49 @@ SQLITE_SCHEMA = (
     "CREATE INDEX IF NOT EXISTS idx_lecturas_lote_timestamp ON lecturas (lote_id, timestamp DESC)",
     "CREATE INDEX IF NOT EXISTS idx_alarmas_nodo_inicio ON alarmas (nodo_id, inicio_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_accesos_puerta_timestamp ON accesos_puerta (nodo_id, timestamp DESC)",
+    """
+    CREATE TABLE IF NOT EXISTS mediciones_energia (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nodo_id TEXT NOT NULL DEFAULT 'SE-01',
+        lote_id INTEGER,
+        potencia_watts REAL NOT NULL,
+        consumo_kwh REAL NOT NULL,
+        voltaje REAL DEFAULT 120.0,
+        corriente REAL DEFAULT 0.0,
+        foco_watts REAL DEFAULT 0.0,
+        ventilador_watts REAL DEFAULT 0.0,
+        motor_watts REAL DEFAULT 0.0,
+        timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS registro_anomalias_ml (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nodo_id TEXT NOT NULL DEFAULT 'SE-01',
+        temperatura REAL NOT NULL,
+        humedad REAL NOT NULL,
+        score_anomalia REAL NOT NULL,
+        umbral REAL NOT NULL,
+        es_anomalia INTEGER NOT NULL DEFAULT 1,
+        detalle TEXT,
+        timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS eventos_seguridad_vision (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nodo_id TEXT NOT NULL DEFAULT 'SE-01',
+        objeto_detectado TEXT NOT NULL,
+        confianza REAL NOT NULL,
+        estado_bloqueo TEXT NOT NULL DEFAULT 'BLOQUEADO',
+        motivo TEXT,
+        duracion_bloqueo_segundos REAL DEFAULT 0,
+        timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_mediciones_energia_nodo_ts ON mediciones_energia (nodo_id, timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_registro_anomalias_nodo_ts ON registro_anomalias_ml (nodo_id, timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_eventos_vision_nodo_ts ON eventos_seguridad_vision (nodo_id, timestamp DESC)",
 )
 
 

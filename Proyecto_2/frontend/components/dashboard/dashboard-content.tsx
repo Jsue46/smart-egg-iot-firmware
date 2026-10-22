@@ -1,18 +1,59 @@
 "use client";
 
+import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { CapacityIcon, ConnectionIcon, HumidityIcon, PauseIcon, PlayIcon, RotationIcon, TemperatureIcon } from "@/components/icons/egg-icons";
+import { CapacityIcon, ConnectionIcon, HumidityIcon, LockIcon, PauseIcon, PlayIcon, RotationIcon, TemperatureIcon } from "@/components/icons/egg-icons";
 import { SensorCard } from "@/components/sensores/sensor-card";
 import { useToast } from "@/components/ui/toast-provider";
 import { useSimulatedTelemetry } from "@/hooks/use-simulated-telemetry";
 import { AnalyticsCharts } from "@/components/graficas/AnalyticsCharts";
 import { IncubatorSignature } from "@/components/escena3d/incubator-signature";
+import { MQTT_WS_URL, NODE_ID } from "@/lib/config";
 
 export function DashboardContent() {
   const telemetry = useSimulatedTelemetry();
   const { showToast } = useToast();
   const reduceMotion = useReducedMotion();
+  const [desbloqueando, setDesbloqueando] = useState(false);
   const freeSlots = Math.max(0, telemetry.capacity - telemetry.occupied);
+
+  const desbloquearSistema = async () => {
+    setDesbloqueando(true);
+    try {
+      const mqtt = await import("mqtt");
+      const client = mqtt.connect(MQTT_WS_URL, {
+        clientId: `web-reset-${Math.random().toString(16).slice(2)}`,
+        clean: true,
+      });
+
+      client.on("connect", () => {
+        const topicBloqueo = `smartegg/${NODE_ID}/control/bloqueo`;
+        const payload = JSON.stringify({
+          nodo_id: NODE_ID,
+          bloquear: false,
+          motivo: "desbloqueo_manual_frontend",
+          timestamp: new Date().toISOString(),
+        });
+        client.publish(topicBloqueo, payload, { qos: 1, retain: true }, () => {
+          client.end();
+          setDesbloqueando(false);
+          showToast({
+            tone: "success",
+            title: "Sistema Desbloqueado",
+            message: "Se envió la orden de reanudación a la incubadora.",
+          });
+        });
+      });
+
+      client.on("error", () => {
+        client.end();
+        setDesbloqueando(false);
+      });
+    } catch {
+      setDesbloqueando(false);
+    }
+  };
+
   const toggleTelemetry = () => {
     telemetry.togglePaused();
     showToast({
@@ -24,6 +65,42 @@ export function DashboardContent() {
 
   return (
     <div className="dashboard-stack">
+      {telemetry.isVisionLocked && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={{
+            background: "var(--alert-soft)",
+            border: "1px solid var(--alert)",
+            color: "var(--alert)",
+            padding: "14px 18px",
+            borderRadius: "14px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+            marginBottom: "8px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "22px" }}>🚨</span>
+            <div>
+              <strong style={{ display: "block", fontSize: "14px" }}>¡BLOQUEO DE SEGURIDAD POR VISIÓN ARTIFICIAL!</strong>
+              <span style={{ fontSize: "12px", opacity: 0.9 }}>Se detectó un objeto extraño en la bandeja. Todo el sistema se encuentra bloqueado.</span>
+            </div>
+          </div>
+          <button
+            className="button secondary compact"
+            type="button"
+            disabled={desbloqueando}
+            style={{ borderColor: "var(--alert)", color: "var(--alert)", fontWeight: 600 }}
+            onClick={desbloquearSistema}
+          >
+            {desbloqueando ? "Restableciendo..." : "Desbloquear Sistema"}
+          </button>
+        </motion.div>
+      )}
+
       <div className="page-intro-row">
         <div><p className="page-lead">Una lectura clara de lo que ocurre dentro de la cámara.</p></div>
         <div className="dashboard-actions">
@@ -68,6 +145,13 @@ export function DashboardContent() {
         <SensorCard className="bento-humidity" label="Humedad" value={telemetry.humidity} suffix="%" decimals={1} detail="Rango 50–65 %" icon={<HumidityIcon />} accent="aqua" state="Estable" />
         <SensorCard className="bento-rotation" label="Rotación" value={telemetry.servoAngle} suffix="°" detail="Ciclo ±45°" icon={<RotationIcon />} accent="violet" state="En ciclo" />
         <SensorCard className="bento-capacity" label="Espacios ocupados" value={telemetry.occupied} suffix={` / ${telemetry.capacity}`} detail={`${freeSlots} ${freeSlots === 1 ? "espacio libre" : "espacios libres"}`} icon={<CapacityIcon />} accent="sprout" state="Disco" />
+        <SensorCard className="bento-energy" label="Potencia Eléctrica" value={telemetry.powerWatts ?? 3.5} suffix="W" decimals={1} detail={`Consumo: ${(telemetry.energyKwh ?? 0).toFixed(4)} kWh`} icon={<span style={{ fontSize: "20px" }}>⚡</span>} accent="yolk" state={telemetry.powerWatts && telemetry.powerWatts > 80 ? "Alerta" : "Eficiente"} />
+        <motion.article className={`sensor-card ${telemetry.isVisionLocked ? "alert" : telemetry.visionClass === "huevo" ? "sprout" : "aqua"} bento-vision`} variants={{ hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0 } }}>
+          <div className="sensor-head"><span className="sensor-icon" style={{ fontSize: "20px" }}>👁️</span><span className={`sensor-state ${telemetry.isVisionLocked ? "alert" : telemetry.visionClass === "huevo" ? "sprout" : "aqua"}`}>{telemetry.isVisionLocked ? "BLOQUEADO" : "Activo"}</span></div>
+          <p>Visión Artificial (IA)</p>
+          <div className="sensor-reading"><span style={{ fontSize: "22px", fontWeight: 700 }}>{telemetry.visionClass ? telemetry.visionClass.toUpperCase() : "VACÍO"}</span></div>
+          <div className="sensor-foot"><span>{telemetry.isVisionLocked ? "Alarma de objeto extraño activa" : "Cámara supervisando bandeja"}</span></div>
+        </motion.article>
       </motion.section>
       <AnalyticsCharts />
     </div>
