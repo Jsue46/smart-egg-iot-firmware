@@ -3,7 +3,7 @@
 # ==============================================================================
 # - Crea Resource Group y VM Linux (Ubuntu 22.04 LTS) con tamaño economico (Standard_B2s).
 # - Configura Auto-Shutdown automatico a las 23:00 hrs para NO gastar creditos de estudiante.
-# - Abre puertos de seguridad: 22 (SSH), 1883 (MQTT), 9001 (MQTT WS), 3000 (Grafana), 5000 (API).
+# - Abre puertos de seguridad: 22 (SSH), 1883 (MQTT), 9001 (MQTT WS), 3000 (Grafana), 3001 (frontend), 5000 (API).
 # - Instala Docker & Docker Compose y levanta el stack completo en la nube.
 # - Crea Storage Account con Hosting Estatico para el Dashboard p5.js.
 # ==============================================================================
@@ -38,8 +38,9 @@ $Rules = @(
     @{ Name="Allow-MQTT"; Port=1883; Priority=1010 },
     @{ Name="Allow-MQTT-WS"; Port=9001; Priority=1020 },
     @{ Name="Allow-Grafana"; Port=3000; Priority=1030 },
-    @{ Name="Allow-Backend"; Port=5000; Priority=1040 },
-    @{ Name="Allow-HTTP"; Port=80; Priority=1050 }
+    @{ Name="Allow-Frontend"; Port=3001; Priority=1040 },
+    @{ Name="Allow-Backend"; Port=5000; Priority=1050 },
+    @{ Name="Allow-HTTP"; Port=80; Priority=1060 }
 )
 
 foreach ($r in $Rules) {
@@ -55,7 +56,7 @@ foreach ($r in $Rules) {
         --source-address-prefixes '*' `
         --output none
 }
-Write-Host "-> Reglas de puertos abiertas: 22, 1883, 9001, 3000, 5000, 80." -ForegroundColor Green
+Write-Host "-> Reglas de puertos abiertas: 22, 1883, 9001, 3000, 3001, 5000, 80." -ForegroundColor Green
 
 # 3. Crear Maquina Virtual
 Write-Host "`n[3/6] Creando Maquina Virtual '$VmName' ($VmSize, Ubuntu 22.04 LTS)..." -ForegroundColor Yellow
