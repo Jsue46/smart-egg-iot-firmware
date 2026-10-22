@@ -1,0 +1,141 @@
+name: smartegg
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smartegg}
+      POSTGRES_USER: ${POSTGRES_USER:-smartegg}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cambiar_esta_clave}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/migrations/001_schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+      - ./backend/migrations/002_fase3_schema.sql:/docker-entrypoint-initdb.d/002_fase3_schema.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [smartegg]
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    volumes:
+      - ./infra/mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    ports:
+      - "${MQTT_PORT:-1883}:1883"
+      - "${MQTT_WS_PORT:-9001}:9001"
+    networks: [smartegg]
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-smartegg}:${POSTGRES_PASSWORD:-cambiar_esta_clave}@postgres:5432/${POSTGRES_DB:-smartegg}
+      NODE_ID: ${NODE_ID:-SE-01}
+      SERIAL_PORT: ${SERIAL_PORT:-}
+      SERIAL_BAUD: ${SERIAL_BAUD:-9600}
+      SERIAL_RETRY_SECONDS: ${SERIAL_RETRY_SECONDS:-5}
+      SIMULATE_TELEMETRY: ${SIMULATE_TELEMETRY:-false}
+      SIMULATION_INTERVAL: ${SIMULATION_INTERVAL:-2}
+      SIMULATION_LOT_ID: ${SIMULATION_LOT_ID:-}
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_CLIENT_ID: ${MQTT_CLIENT_ID:-smartegg-backend-se01}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      API_PORT: 5000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    ports:
+      - "${API_PORT:-5000}:5000"
+    networks: [smartegg]
+
+  grafana:
+    build:
+      context: .
+      dockerfile: infra/grafana/Dockerfile
+    image: smartegg-grafana:12.0.0-mqtt-1.1.0
+    restart: unless-stopped
+    environment:
+      GF_PATHS_PLUGINS: /opt/smartegg-grafana-plugins
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: grafana-mqtt-datasource
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      MQTT_GRAFANA_URI: tcp://mosquitto:1883
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      GRAFANA_MQTT_CLIENT_ID: ${GRAFANA_MQTT_CLIENT_ID:-grafana-smartegg}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-smartegg}
+      POSTGRES_USER: ${POSTGRES_USER:-smartegg}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cambiar_esta_clave}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./infra/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./infra/grafana/provisioning/alerting:/etc/grafana/provisioning/alerting:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks: [smartegg]
+
+  ml:
+    build:
+      context: ./ml
+    restart: unless-stopped
+    environment:
+      NODE_ID: ${NODE_ID:-SE-01}
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_CLIENT_ID: ${ML_MQTT_CLIENT_ID:-smartegg-ml-se01}
+    depends_on:
+      mosquitto:
+        condition: service_started
+    networks: [smartegg]
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5000}
+        NEXT_PUBLIC_MQTT_WS_URL: ${NEXT_PUBLIC_MQTT_WS_URL:-ws://localhost:9001}
+        NEXT_PUBLIC_NODE_ID: ${NODE_ID:-SE-01}
+        NEXT_PUBLIC_P5_DASHBOARD_URL: ${NEXT_PUBLIC_P5_DASHBOARD_URL:-/visualizacion_p5.html}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "${FRONTEND_PORT:-3001}:3000"
+    networks: [smartegg]
+
+networks:
+  smartegg:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mosquitto_data:
+  mosquitto_log:
+  grafana_data:

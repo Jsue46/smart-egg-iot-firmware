@@ -1,0 +1,167 @@
+openapi: 3.0.3
+info:
+  title: SmartEgg API
+  version: 1.0.0
+  description: API REST para estado del servicio, lotes y operaciones administrativas. La telemetría se distribuye exclusivamente por MQTT.
+servers:
+  - url: http://localhost:5000
+paths:
+  /health:
+    get:
+      summary: Estado de los servicios
+      responses:
+        '200':
+          description: Backend, base de datos y conectividad disponibles.
+        '503':
+          description: Backend en estado degradado.
+  /huevo:
+    post:
+      summary: Registrar lote de huevos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LotInput'
+      responses:
+        '201':
+          description: Lote registrado.
+        '400':
+          description: Faltan campos o tienen formato inválido.
+  /huevos:
+    get:
+      summary: Listar lotes registrados
+      responses:
+        '200':
+          description: Lotes del nodo.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Lot'
+  /alarmas:
+    get:
+      summary: Listar alarmas y sus intervalos
+      responses:
+        '200':
+          description: Alarmas recientes, activas o resueltas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Alarm'
+  /operadores:
+    get:
+      summary: Listar operadores
+      responses:
+        '200':
+          description: Operadores habilitados.
+  /puerta:
+    post:
+      summary: Registrar apertura o cierre de puerta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accion]
+              properties:
+                accion:
+                  type: string
+                  enum: [ABRIR, CERRAR]
+                operador_id:
+                  type: integer
+                cantidad_huevos:
+                  type: integer
+                  minimum: 0
+      responses:
+        '201':
+          description: Evento registrado.
+        '400':
+          description: Acción inválida.
+  /accesos-puerta:
+    get:
+      summary: Historial de accesos de puerta
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Eventos de puerta.
+  /reporte:
+    get:
+      summary: Descargar reporte PDF
+      responses:
+        '200':
+          description: Reporte operativo generado.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+components:
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 100
+  schemas:
+    LotInput:
+      type: object
+      required: [lote, etiqueta]
+      properties:
+        lote:
+          type: string
+        etiqueta:
+          type: string
+        fecha_ingreso:
+          type: string
+          format: date
+        cantidad:
+          type: integer
+          minimum: 1
+        temperatura_requerida:
+          type: number
+        tecnico:
+          type: string
+        notas:
+          type: string
+    Lot:
+      allOf:
+        - $ref: '#/components/schemas/LotInput'
+        - type: object
+          properties:
+            id:
+              type: integer
+            status:
+              type: string
+    Alarm:
+      type: object
+      properties:
+        id:
+          type: integer
+        nodo_id:
+          type: string
+        tipo:
+          type: string
+        severidad:
+          type: string
+          enum: [info, warning, critical]
+        descripcion:
+          type: string
+        activa:
+          type: boolean
+        inicio_at:
+          type: string
+          format: date-time
+        resolucion_at:
+          type: string
+          format: date-time
+          nullable: true

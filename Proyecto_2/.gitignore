@@ -1,0 +1,23 @@
+# Material local de apoyo
+tmp/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.db
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# Entornos y credenciales locales
+.env
+.env.local
+.env.*.local
+
+# Dataset sintético del módulo ML (se regenera con ml/generar_dataset.py)
+ml/data/lecturas_sinteticas.csv
