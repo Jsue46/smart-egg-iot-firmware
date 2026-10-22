@@ -68,6 +68,13 @@ export function DashboardContent() {
         <SensorCard className="bento-humidity" label="Humedad" value={telemetry.humidity} suffix="%" decimals={1} detail="Rango 50–65 %" icon={<HumidityIcon />} accent="aqua" state="Estable" />
         <SensorCard className="bento-rotation" label="Rotación" value={telemetry.servoAngle} suffix="°" detail="Ciclo ±45°" icon={<RotationIcon />} accent="violet" state="En ciclo" />
         <SensorCard className="bento-capacity" label="Espacios ocupados" value={telemetry.occupied} suffix={` / ${telemetry.capacity}`} detail={`${freeSlots} ${freeSlots === 1 ? "espacio libre" : "espacios libres"}`} icon={<CapacityIcon />} accent="sprout" state="Disco" />
+        <SensorCard className="bento-energy" label="Potencia Eléctrica" value={telemetry.powerWatts ?? 3.5} suffix="W" decimals={1} detail={`Consumo: ${(telemetry.energyKwh ?? 0).toFixed(4)} kWh`} icon={<span style={{ fontSize: "20px" }}>⚡</span>} accent="yolk" state={telemetry.powerWatts && telemetry.powerWatts > 80 ? "Alerta" : "Eficiente"} />
+        <motion.article className={`sensor-card ${telemetry.isVisionLocked ? "alert" : telemetry.visionClass === "huevo" ? "sprout" : "aqua"} bento-vision`} variants={{ hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0 } }}>
+          <div className="sensor-head"><span className="sensor-icon" style={{ fontSize: "20px" }}>👁️</span><span className={`sensor-state ${telemetry.isVisionLocked ? "alert" : telemetry.visionClass === "huevo" ? "sprout" : "aqua"}`}>{telemetry.isVisionLocked ? "BLOQUEADO" : "Activo"}</span></div>
+          <p>Visión Artificial (IA)</p>
+          <div className="sensor-reading"><span style={{ fontSize: "22px", fontWeight: 700 }}>{telemetry.visionClass ? telemetry.visionClass.toUpperCase() : "VACÍO"}</span></div>
+          <div className="sensor-foot"><span>{telemetry.isVisionLocked ? "Alarma de objeto extraño activa" : "Cámara supervisando bandeja"}</span></div>
+        </motion.article>
       </motion.section>
       <AnalyticsCharts />
     </div>

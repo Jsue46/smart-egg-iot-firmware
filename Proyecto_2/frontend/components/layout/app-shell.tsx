@@ -18,6 +18,7 @@ import {
   MenuIcon,
   PlusEggIcon,
   ReportIcon,
+  RotationIcon,
   UserIcon,
 } from "@/components/icons/egg-icons";
 
@@ -30,6 +31,7 @@ interface NavItem {
 
 const navigation: NavItem[] = [
   { href: "/dashboard", label: "Panel", icon: DashboardIcon, roles: ["administrador", "operador1", "operador2"] },
+  { href: "/simulador", label: "Simulador p5.js", icon: RotationIcon, roles: ["administrador", "operador1", "operador2"] },
   { href: "/lotes", label: "Lotes", icon: LotIcon, roles: ["administrador", "operador1", "operador2"] },
   { href: "/reportes", label: "Reportes", icon: ReportIcon, roles: ["administrador", "operador1", "operador2"] },
   { href: "/puerta", label: "Puerta", icon: DoorIcon, roles: ["operador1", "operador2"] },
@@ -76,6 +78,7 @@ function Navigation({ mobile = false, collapsed = false, items }: { mobile?: boo
 function PageTitle({ pathname }: { pathname: string }) {
   const titles: Record<string, string> = {
     "/dashboard": "Panel de incubación",
+    "/simulador": "Simulador interactivo y Visión AI (Fase 3)",
     "/reportes": "Reportes",
     "/lotes/nuevo": "Registrar lote",
     "/lotes": "Lotes",
