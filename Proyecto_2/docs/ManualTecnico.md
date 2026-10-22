@@ -14,21 +14,21 @@ Para este **Proyecto 1**, la solución evoluciona desde un sistema aislado hacia
 El proyecto mantiene la lógica de hardware y de negocio establecida en la práctica inicial, expandiendo sus capacidades a través de los siguientes ejes de continuidad:
 
 * **Capa de Adquisición Física (Microcontrolador & Serial):**
-  Se preserva la integración con el microcontrolador físico mediante comunicación serial UART. El backend continúa procesando las tramas JSON estructuradas enviadas desde el hardware, garantizando resiliencia operativa mediante un hilo daemon que reintenta la conexión automáticamente ante una desconexión física. El simulador queda desactivado por defecto y solo se habilita explícitamente para pruebas locales. Como ampliación del proyecto, se incorpora el registro físico de acceso a cabina mediante switch/sensor para el control de operadores.
+  Se preserva la integración con el microcontrolador físico mediante UART. En despliegue, el puente serial del host publica la telemetría por MQTT; el lector serial del backend queda disponible para pruebas locales y reintenta la conexión ante desconexiones físicas. El simulador queda desactivado por defecto. También se registra el acceso físico a cabina mediante switch/sensor.
 
 * **Núcleo del Backend (Python & Flask):**
-  La API REST conserva y estandariza los contratos de datos originales (`/datos`, `/historial`, `/huevos`, `/alarmas`, `/reporte`), ampliándose funcionalmente como un **nodo publicador MQTT**. Cada lectura serial capturada se procesa hacia la base de datos relacional y se despacha de forma asíncrona hacia los tópicos correspondientes del broker.
+  Flask expone operaciones administrativas (lotes, operadores, alarmas, eventos de puerta y reportes). La telemetría no se consulta ni se envía por HTTP: el backend recibe por MQTT la lectura completa para persistirla en la base relacional.
 
 * **Transición de Persistencia (SQLite a Base de Datos Relacional Contenerizada):**
   El esquema inicial de almacenamiento migra hacia un motor relacional formal orquestado en Docker (PostgreSQL/MySQL), integrando un modelo entidad-relación normalizado que soporta el ciclo de vida de lotes, operadores designados (Operador 1, Operador 2, Administrador), bitácora de accesos de puerta y métricas históricas indexadas.
 
-* **Capa de Transporte Híbrida (REST + MQTT sobre WebSockets):**
-  A diferencia de la Práctica 1, donde toda la actualización dependía de sondeo periódico HTTP (*polling*), el Proyecto 1 desacopla las alertas críticas. Los eventos de alarma y cambios de estado se distribuyen mediante el protocolo MQTT bajo calidad de servicio (QoS 1), retención de mensajes y Last Will and Testament (LWT), permitiendo que las alertas se reflejen en la interfaz en menos de 3 segundos sin recargar el navegador.
+* **Capa de Transporte Híbrida (REST administrativo + MQTT sobre WebSockets):**
+  La telemetría, los estados de actuadores y los eventos en tiempo real se distribuyen mediante MQTT. REST queda para lotes y otras operaciones administrativas. Los mensajes de estado utilizan QoS, retención y Last Will and Testament (LWT) para que la interfaz observe cambios sin sondeo HTTP.
 
 * **Ecosistema de Frontend y Observabilidad (Next.js & Grafana):**
   La interfaz de usuario pasa a construirse sobre Next.js (React + TypeScript) con una estética editorial botánica adaptada a la identidad del proyecto. En este entorno convergen:
   1. Paneles analíticos construidos con **Chart.js** para el seguimiento continuo de tendencias térmicas y ocupación histórica.
-  2. Un lienzo interactivo en 2D desarrollado con **p5.js** que renderiza digitalmente el habitáculo mecánico, el plato de soporte a $\pm45^\circ$, el flujo dinámico de vapor y las advertencias de cabina consumiendo la telemetría en vivo.
+  2. Un dashboard web independiente e interactivo en **p5.js**, con gráficas 2D de temperatura, humedad y potencia que consume telemetría MQTT.
   3. Dashboards avanzados en **Grafana** conectados al broker MQTT y a la base de datos para la supervisión y auditoría de la infraestructura operativa.
 
 ## 2. Diagrama de arquitectura general
@@ -46,21 +46,21 @@ La arquitectura de **SmartEgg IoT** desacopla la adquisición de señales físic
   * **Protocolo / Interfaz:** Conexiones directas por entradas y salidas analógicas/digitales (GPIO) e interfaces de un solo hilo (One-Wire).
   * **Descripción:** Los transductores físicos (sensor DHT11 para temperatura y humedad, finales de carrera para conteo de huevos y sensor/switch de acceso de puerta) envían sus señales eléctricas al microcontrolador. En sentido inverso, el microcontrolador conmuta los actuadores de cabina (relés para foco calefactor y ventilador extractor) y envía el tren de pulsos PWM hacia el servomotor MG996R para el ciclo de inclinación de la bandeja a $\pm45^\circ$.
 
-* **2. Microcontrolador $\longrightarrow$ Backend REST/API (`Serial Bus`):**
-  * **Protocolo / Interfaz:** Comunicación Serial UART sobre puerto USB (9600 baudios).
-  * **Descripción:** El microcontrolador serializa periódicamente las lecturas en una trama de texto JSON (`{"temperatura": 37.5, "humedad": 58.0, ...}`). El backend mantiene un hilo trabajador en segundo plano (*daemon thread*) que escucha continuamente el puerto serial con reconexión automática, deserializa el payload y lo pasa a las capas de persistencia y despacho.
+* **2. Microcontrolador $\longrightarrow$ Puente serial $\longrightarrow$ MQTT Broker:**
+  * **Protocolo / Interfaz:** UART sobre USB (9600 baudios) y MQTT sobre TCP (puerto 1883).
+  * **Descripción:** El puente lee las tramas JSON del Arduino, publica las variables en sus tópicos MQTT en vivo y envía el objeto completo a `smartegg/{id}/sensores/lectura` con QoS 1. El suscriptor MQTT del backend valida y persiste esa lectura. Para pruebas locales también se puede habilitar la lectura serial directa del backend.
 
 * **3. Backend REST/API $\longleftrightarrow$ Base de Datos (`Query` / Persistencia):**
   * **Protocolo / Interfaz:** Conector SQL / TCP sobre red interna de contenedores.
-  * **Descripción:** Conexión bidireccional transaccional. En sentido ascendente, el backend ejecuta sentencias `INSERT` para almacenar cada lectura de telemetría, registro de alarmas críticas y eventos de apertura/cierre de puerta. En sentido descendente, atiende peticiones analíticas y consultas históricas mediante sentencias `SELECT` indexadas (por ejemplo, para responder al endpoint `/historial` y nutrir el generador de reportes PDF).
+  * **Descripción:** El suscriptor MQTT ejecuta `INSERT` transaccionales para guardar las lecturas recibidas, alarmas y eventos. Las consultas SQL se usan en operaciones administrativas y para construir reportes; la interfaz no recupera telemetría mediante endpoints REST.
 
 * **4. Backend REST/API $\longleftrightarrow$ Frontend Web (`Request` / HTTP REST):**
   * **Protocolo / Interfaz:** HTTP/1.1 (JSON) sobre TCP/IP con soporte CORS.
-  * **Descripción:** Comunicación cliente-servidor sincrónica bajo demanda. El frontend consume los contratos de datos expuestos por la API REST (`GET /datos`, `GET /historial`, `GET /huevos`, `POST /huevo`, `GET /reporte`). A través de este canal, la interfaz alimenta periódicamente las tarjetas analíticas de Chart.js y proporciona las lecturas de estado al lienzo interactivo de p5.js.
+  * **Descripción:** Comunicación cliente-servidor para acciones administrativas bajo demanda, como lotes y reportes. La interfaz recibe temperatura, humedad, actuadores, alarmas y eventos en vivo directamente por MQTT sobre WebSockets.
 
-* **5. Backend REST/API $\longrightarrow$ MQTT Broker (`Publisher`):**
+* **5. Puente serial/backend $\longrightarrow$ MQTT Broker (`Publisher`):**
   * **Protocolo / Interfaz:** Protocolo MQTT 3.1.1 sobre TCP (puerto estándar 1883).
-  * **Descripción:** El backend opera como un cliente publicador (*Publisher*). Cada vez que valida una nueva muestra del puerto serial o detecta condiciones de riesgo térmico/humedad, publica la información en tópicos jerárquicos estructurados (por ejemplo, `smartegg/{id}/sensores/temperatura` y `smartegg/{id}/alarmas/critica`). En las alertas críticas se configura QoS 1 y mensajes retenidos (*retained*), garantizando la entrega confiable y el estado Last Will and Testament (LWT) para supervisión de conectividad.
+  * **Descripción:** El puente publica temperatura, humedad y estado de actuadores; además publica el objeto completo en `smartegg/{id}/sensores/lectura` para que el backend lo guarde. El backend publica alarmas y estado de conectividad (Last Will and Testament, LWT). Los clientes web se conectan al listener MQTT sobre WebSockets (puerto 9001).
 
 * **6. MQTT Broker $\longrightarrow$ Frontend Web (`WebSockets` / Tiempo Real):**
   * **Protocolo / Interfaz:** MQTT sobre WebSockets (`ws://` / `wss://` en el puerto 9001).
@@ -75,19 +75,20 @@ La arquitectura de **SmartEgg IoT** desacopla la adquisición de señales físic
   * **Descripción:** Grafana ejecuta consultas directas de solo lectura contra el motor de base de datos relacional. Mediante agregaciones SQL (`AVG`, `MAX`, `MIN`), nutre tableros de analítica avanzada que muestran tendencias históricas semanales, duraciones acumuladas de alarmas térmicas y registros de acceso de los operadores a lo largo de los lotes de incubación.
 
 ### 2.3 Flujo Integrado de Datos Extremo a Extremo
-1. El microcontrolador envía periódicamente una línea JSON estructurada por el bus UART a 9600 baudios.
-2. Flask valida la lectura, la registra en PostgreSQL y gestiona la apertura o cierre de intervalos de alarma térmica.
-3. El publicador MQTT envía telemetría, estado de actuadores y alarmas; mantiene `status=online` y configura Last Will and Testament (LWT) como `offline`.
-4. Grafana utiliza MQTT para el dashboard de operación en vivo y PostgreSQL para la analítica histórica.
-5. Next.js consume la API REST para lotes e histórico, y se conecta mediante MQTT.js sobre WebSockets para recibir alarmas y estado sin recargar la página.
+1. El microcontrolador envía periódicamente una línea JSON estructurada por UART al puente serial.
+2. El puente publica telemetría y actuadores por MQTT, además de la muestra completa en `sensores/lectura`.
+3. El suscriptor MQTT del backend persiste la lectura en PostgreSQL y gestiona intervalos de alarma térmica.
+4. El backend publica alarmas y conectividad; `status` usa Last Will and Testament (LWT) con `offline`.
+5. Grafana utiliza MQTT para el dashboard en vivo y PostgreSQL para analítica histórica. Next.js recibe telemetría por MQTT sobre WebSockets.
 
 > **Estandarización temporal:** Todos los timestamps se publican y almacenan en formato UTC / ISO 8601 para garantizar consistencia. Ambos dashboards en Grafana operan con `timezone: browser`, adaptando automáticamente las series temporales al huso horario del operador.
 
-### 2.4 Flujo de alarmas del frontend: cliente MQTT vs cliente REST
+### 2.4 Flujo de telemetría y alarmas del frontend: MQTT y REST administrativo
 
-El frontend (Next.js / React / TypeScript) mantiene **dos clientes de transporte separados** para cumplir la separación entre datos en tiempo real y datos bajo demanda:
+El frontend (Next.js / React / TypeScript) mantiene **dos clientes de transporte separados**: MQTT para el flujo en vivo y REST para operaciones administrativas bajo demanda.
 
 * **Cliente MQTT (alarmas y eventos en vivo):** implementado con la librería `mqtt.js` sobre WebSocket (`ws://localhost:9001`). Se suscribe a los tópicos críticos del broker:
+  * `smartegg/SE-01/sensores/temperatura` y `.../sensores/humedad` — telemetría ambiental.
   * `smartegg/SE-01/alarmas/critica` — condiciones fuera de rango.
   * `smartegg/SE-01/puerta/evento` — apertura/cierre de cabina.
   * `smartegg/SE-01/status` — disponibilidad del nodo (LWT).
@@ -95,29 +96,32 @@ El frontend (Next.js / React / TypeScript) mantiene **dos clientes de transporte
 
   Al recibir un mensaje de `alarmas/critica` con `activa: true`, la interfaz propaga el evento en menos de 3 segundos: banner **ALARMA ACTIVA**, *toast* emergente, indicador sonoro (desactivable) y actualización del centro de alarmas con la distinción entre eventos **activos** y **resueltos**. La notificación se dispara por *transición* de estado (activa → resuelta), no por cada lectura, para evitar repetir sonidos mientras la condición permanece fuera de rango.
 
-* **Cliente HTTP/REST (datos generales bajo demanda):** implementado con `fetch` hacia la API de Flask para lecturas periódicas y operaciones transaccionales:
-  * Consultas: `GET /datos`, `GET /historial`, `GET /huevos`, `GET /alarmas`, `GET /accesos-puerta`, `GET /operadores`, `GET /reporte`.
+* **Cliente HTTP/REST (operaciones administrativas):** implementado con `fetch` hacia la API de Flask:
+  * Consultas: `GET /huevos`, `GET /alarmas`, `GET /accesos-puerta`, `GET /operadores`, `GET /reporte`.
   * Operaciones: `POST /huevo` (registro de ficha/lote) y `POST /puerta` (apertura/cierre).
 
-  Este cliente alimenta los paneles, gráficos (Chart.js), listados de lotes, el perfil del operador, la consola de administración y el generador de reportes PDF, con sondeo ligero de 2 segundos y validación explícita mediante códigos HTTP.
+  Este cliente alimenta las vistas administrativas y el generador de reportes PDF. La telemetría y los gráficos recientes se actualizan por suscripción MQTT; no usan sondeo HTTP.
 
 | Canal | Rol | Mecanismo | Latencia esperada |
 |---|---|---|---|
-| MQTT (WebSocket) | Alarmas, eventos de puerta y estado del nodo | Publicador/suscriptor vía broker | < 3 s (push, sin recarga) |
-| HTTP/REST | Consultas y transacciones (lotes, puerta, reportes, administración) | Petición/respuesta con códigos de estado | Bajo demanda (+ sondeo 2 s) |
+| MQTT (WebSocket) | Telemetría, actuadores, alarmas, eventos de puerta y estado del nodo | Publicador/suscriptor vía broker | En vivo (push, sin recarga) |
+| HTTP/REST | Lotes y operaciones administrativas | Petición/respuesta con códigos de estado | Bajo demanda |
 
-Esta separación sigue lo recomendado para el proyecto: las alarmas viajan por el canal *push* (MQTT) para evitar el sondeo de condiciones críticas, mientras los datos generales se consultan por REST sin mezclar ambos flujos.
+Esta separación mantiene toda la telemetría y el control en MQTT; las solicitudes REST se reservan para datos y operaciones administrativas.
 
 ## 3. Documentación de la Jerarquía de Topics MQTT
 
 | Topic | QoS | Retained | Publicador | Suscriptores | Contenido / Payload |
 |---|:---:|:---:|---|---|---|
-| `smartegg/SE-01/sensores/temperatura` | 0 | No | Backend Flask | Grafana, Frontend | `{valor, unidad, timestamp}` |
-| `smartegg/SE-01/sensores/humedad` | 0 | No | Backend Flask | Grafana, Frontend | `{valor, unidad, timestamp}` |
-| `smartegg/SE-01/actuadores/estado` | 1 | Sí | Backend Flask | Grafana, Frontend | `{foco, ventilador, rotacion_grados}` |
+| `smartegg/SE-01/sensores/temperatura` | 0 | No | Puente serial | Grafana, Frontend | `{valor, unidad, timestamp}` |
+| `smartegg/SE-01/sensores/humedad` | 0 | No | Puente serial | Grafana, Frontend | `{valor, unidad, timestamp}` |
+| `smartegg/SE-01/sensores/lectura` | 1 | No | Puente serial | Backend MQTT | Lectura completa para persistencia |
+| `smartegg/SE-01/actuadores/estado` | 1 | Sí | Puente serial | Grafana, Frontend | `{foco, ventilador, rotacion_grados}` |
 | `smartegg/SE-01/alarmas/critica` | 1 | Sí | Backend Flask | Grafana, Frontend | `{activa, tipo, severidad, inicio_at, resolucion_at}` |
 | `smartegg/SE-01/status` | 1 | Sí | Backend Flask (LWT Broker) | Grafana, Frontend | `{estado, valor}`; `offline`/`valor=0` es el LWT |
-| `smartegg/SE-01/puerta/evento` | 1 | No | Backend Flask | Grafana, Frontend | `{id, accion, operador_id, cantidad_huevos, timestamp}` |
+| `smartegg/SE-01/puerta/evento` | 1 | No | Puente serial/backend | Grafana, Frontend | `{id, accion, operador_id, cantidad_huevos, timestamp}` |
+| `smartegg/SE-01/control/energia` | 1 | No | Frontend | Servicio de energía, puente serial | Límite de potencia y temporizador |
+| `smartegg/SE-01/control/actuadores` | 1 | Sí | Servicio de energía | Puente serial | Última orden: `{accion: APAGAR}` al vencer; `{accion: REANUDAR}` al programar o cancelar |
 
 * **Detalles de configuración:** Broker Mosquitto con listener TCP en puerto 1883 y listener WebSocket en puerto 9001. Documentación completa de pruebas y esquemas en `infra/mqtt/README.md`.
 
@@ -151,8 +155,6 @@ El contrato OpenAPI completo del sistema se encuentra definido en [`openapi.yaml
 
 ### 5.1 Catálogo de Endpoints Principales
 * `GET /health`: Comprobación de estado del servicio y conectividad con la base de datos.
-* `GET /datos`: Lectura de telemetría instantánea y actuadores en vivo.
-* `GET /historial`: Muestras históricas continuas para gráficas y analítica.
 * `POST /huevo` / `GET /huevos`: Registro y consulta de estados de huevos por posición.
 * `GET /alarmas`: Registro de eventos críticos e intervalos de superación de umbral.
 * `GET /operadores`: Listado de usuarios autorizados (Operador 1, Operador 2, Administrador).
@@ -187,44 +189,33 @@ La prueba LWT utiliza el topic aislado `smartegg/ROL4-TEST/status` para no inter
 
 ### 7.1 Visualización interactiva con p5.js
 
-La visualización interactiva principal del dashboard está construida con **p5.js 1.9.0**. p5.js es una biblioteca JavaScript orientada a la creación de gráficos interactivos y animaciones mediante un elemento `canvas` HTML. Se eligió para representar de manera sencilla y visual el estado de la incubadora sin depender de un modelo 3D complejo.
+El dashboard independiente usa **p5.js 1.9.0** para dibujar gráficas 2D dentro de un `canvas`. El archivo fuente es `dashboard_p5/index.html`; la misma página está disponible localmente en `frontend/public/visualizacion_p5.html` y se publica como sitio estático en Azure Blob Storage. En el panel Next.js, el botón **Abrir dashboard p5.js** abre esta interfaz en una pestaña nueva. No se incrusta dentro de la tarjeta del modelo 3D.
 
-La visualización se encuentra en `frontend/public/visualizacion_p5.html` y se integra en el dashboard mediante un `iframe` desde el componente `IncubatorVisualizer`. Al estar dentro de la carpeta `public`, el archivo se accede desde la ruta `/visualizacion_p5.html`.
+La página presenta lecturas ambientales, clasificación de visión, estado del modelo ML, actuadores y consumo eléctrico. El canvas permite elegir entre las tendencias de temperatura, humedad y potencia, y muestra detalles al pasar sobre las lecturas. Los valores empiezan vacíos y aparecen cuando llegan mensajes; no se muestran mediciones de ejemplo.
 
-El programa utiliza las funciones principales de p5.js:
+* `setup()` crea el lienzo y abre la conexión al broker por MQTT sobre WebSockets.
+* `draw()` dibuja la variable seleccionada y actualiza el cursor y la lectura resaltada.
+* `createCanvas()` crea el lienzo según el tamaño disponible y `windowResized()` lo adapta al cambiar la ventana.
+* Los botones de selección cambian entre temperatura, humedad y potencia. El control deslizante de energía, el temporizador y la acción de desbloqueo publican órdenes MQTT.
+* El dashboard mantiene hasta 72 muestras recientes por variable en memoria local de la página.
 
-* `setup()` crea el lienzo, configura el modo angular y prepara las partículas que representan el vapor o la humedad.
-* `draw()` se ejecuta continuamente para redibujar la escena y actualizar el movimiento de las partículas, el foco, el ventilador, la bandeja y los huevos.
-* `createCanvas()` genera el área de renderizado adaptada al tamaño del `iframe`.
-* Las transformaciones `translate()` y `rotate()` permiten mostrar la rotación de la bandeja según el ángulo recibido del servomotor.
-
-La escena representa los siguientes elementos del sistema SmartEgg:
-
-* El color ambiental cambia según la temperatura.
-* Las partículas animadas reaccionan al valor de humedad.
-* El foco se muestra encendido o apagado según el estado del actuador.
-* El ventilador extractor cambia su apariencia cuando está activo.
-* La bandeja circular gira de acuerdo con `rotacion_grados` o `servo_ang`.
-* Los huevos ocupan las posiciones correspondientes a la cantidad calculada a partir de `espacios_libres`.
-* El marco y la banda de alerta se activan cuando la API reporta una alarma o la temperatura supera el umbral crítico.
-
-Cada dos segundos, el archivo ejecuta una petición `fetch` al endpoint `GET /datos` del backend Flask. La respuesta actualiza temperatura, humedad, espacios libres, estados de los actuadores, rotación y alarma. Por lo tanto, la escena no depende únicamente de valores estáticos: consume la telemetría real expuesta por la API REST.
+La interfaz recibe mensajes de `smartegg/{id}/sensores/temperatura`, `.../sensores/humedad`, `.../actuadores/estado`, `.../vision/estado`, `.../ml/anomalia` y `.../energia/consumo`. No consulta REST para telemetría ni para el estado de actuadores.
 
 ### 7.2 Uso de Three.js
 
 El proyecto incluye las dependencias `three`, `@react-three/fiber` y `@react-three/drei`, que permiten construir escenas 3D con Three.js dentro de React. Estas herramientas son adecuadas para modelos tridimensionales, cámaras, luces, materiales y controles de navegación.
 
-Sin embargo, la visualización que se muestra actualmente en el dashboard para representar la incubadora es la implementación 2D realizada con p5.js. Three.js no es la biblioteca que renderiza esa visualización activa; sus componentes se conservan como soporte para posibles escenas 3D futuras o para pruebas del prototipo. Esta distinción evita documentar como funcional una visualización que no corresponde al panel actualmente desplegado.
+Three.js, mediante `@react-three/fiber` y `@react-three/drei`, renderiza el modelo tridimensional en el panel Next.js. Esa vista es independiente del dashboard p5.js, que dibuja tendencias 2D y se abre desde el botón del encabezado del Panel.
 
-### 7.3 Gráficos analíticos con Chart.js
+### 7.3 Gráficos recientes con Chart.js
 
-Para los gráficos históricos se utiliza **Chart.js 4.5.1**, integrado en React mediante **react-chartjs-2**. Chart.js se seleccionó porque ofrece una API clara para construir gráficos de líneas y barras, soporta actualización de datos, tooltips, leyendas, escalas y diseño responsive, y se integra directamente con el ciclo de renderizado de los componentes React.
+Para los gráficos de tendencias recientes se utiliza **Chart.js 4.5.1**, integrado en React mediante **react-chartjs-2**. Chart.js se seleccionó porque ofrece una API clara para construir gráficos de líneas y barras, soporta actualización de datos, tooltips, leyendas, escalas y diseño responsive, y se integra directamente con el ciclo de renderizado de los componentes React.
 
-El componente `AnalyticsCharts` consulta el endpoint `GET /historial?limit=100` mediante `fetch`. La respuesta se almacena en el estado del componente y se actualiza automáticamente cada cuatro segundos. Para mantener el gráfico legible, se muestran las últimas 15 lecturas en orden cronológico.
+El componente `AnalyticsCharts` utiliza las muestras recientes que mantiene `useTelemetry` a partir de los mensajes MQTT de temperatura y humedad. El gráfico se actualiza al llegar nuevas lecturas; no consulta un endpoint HTTP de historial.
 
 Actualmente se presentan dos gráficos:
 
-1. **Historial térmico y de humedad:** gráfico de líneas que muestra temperatura en grados Celsius y humedad relativa en porcentaje. Cada punto corresponde a una lectura almacenada en la base de datos.
+1. **Tendencia térmica y de humedad reciente:** gráfico de líneas que muestra temperatura en grados Celsius y humedad relativa en porcentaje a partir de muestras MQTT recibidas.
 2. **Registro de ocupación:** gráfico de barras que calcula los huevos ocupados mediante `3 - espacios_libres`, respetando la capacidad de tres posiciones de la bandeja.
 
 Chart.js registra los módulos `CategoryScale`, `LinearScale`, `PointElement`, `LineElement`, `BarElement`, `Title`, `Tooltip`, `Legend` y `Filler`. Esto permite trabajar con etiquetas de tiempo, escalas numéricas, puntos, líneas, barras, áreas rellenas, leyendas y ayudas emergentes.
@@ -233,20 +224,19 @@ Chart.js registra los módulos `CategoryScale`, `LinearScale`, `PointElement`, `
 
 El flujo implementado es el siguiente:
 
-1. El microcontrolador envía las lecturas al backend mediante comunicación serial.
-2. Flask valida y persiste las lecturas en la base de datos.
-3. El endpoint `GET /datos` entrega el estado actual para la escena p5.js.
-4. El endpoint `GET /historial` entrega las lecturas históricas para Chart.js.
-5. p5.js representa el estado actual en tiempo real, mientras Chart.js presenta la evolución histórica de las variables.
+1. El puente serial publica las muestras del microcontrolador en MQTT, incluidos los tópicos de sensores y actuadores.
+2. La lectura completa se publica en `smartegg/{id}/sensores/lectura`; el backend la recibe por MQTT y la persiste en PostgreSQL.
+3. La interfaz Next.js recibe los valores en vivo del broker mediante MQTT sobre WebSockets; el dashboard p5.js abre su propia suscripción al mismo broker.
+4. `useTelemetry` conserva una ventana de muestras recibidas para Chart.js. El dashboard p5.js mantiene hasta 72 muestras recientes por variable para su canvas.
 
-Esta separación permite utilizar cada herramienta según su propósito: p5.js se encarga de la representación interactiva y animada de la incubadora, y Chart.js de la comparación y análisis de las mediciones almacenadas.
+Así, Three.js representa la maqueta 3D, p5.js ofrece el dashboard interactivo de tendencias y Chart.js muestra las gráficas de la aplicación React.
 
 ### 7.5 Ventajas y consideraciones técnicas
 
-* **p5.js:** facilita la creación de una escena animada personalizada y permite relacionar directamente cada elemento visual con una variable de telemetría.
+* **p5.js:** crea una interfaz de gráficas 2D interactivas que se alimenta de mensajes MQTT.
 * **Chart.js:** reduce el código necesario para crear gráficos profesionales y proporciona escalas, leyendas, tooltips y adaptación responsive.
-* **Three.js:** queda disponible para una futura representación 3D más detallada, pero no es necesario para la visualización p5.js actualmente utilizada.
-* **REST y `fetch`:** mantienen una integración simple entre el frontend y Flask. El sondeo periódico permite refrescar los datos sin recargar la página completa.
+* **Three.js:** renderiza el modelo 3D del panel React; no forma parte del dashboard p5.js.
+* **REST y `fetch`:** mantienen una integración simple para lotes y otras operaciones administrativas; la telemetría se actualiza por MQTT, sin sondeo HTTP.
 
 ### 7.6 Video Demostrativo
 * **Demostración en video:** [Ver Video Demostrativo de SmartEgg (Google Drive)](https://drive.google.com/drive/folders/1w0q4TgvbBKzDrHfzG4wQCiI1_iPQEONU?usp=sharing)
@@ -255,13 +245,13 @@ Esta separación permite utilizar cada herramienta según su propósito: p5.js s
 
 ## 8. Documento comparativo HTTP vs. MQTT
 
-SmartEgg utiliza una arquitectura híbrida: HTTP/REST para operaciones bajo demanda y MQTT para telemetría, estados y eventos en tiempo real.
+SmartEgg utiliza REST para operaciones administrativas bajo demanda y MQTT para telemetría, estados, controles y eventos en tiempo real.
 
 ### 8.1 HTTP en IoT
 
 HTTP sigue el modelo **cliente-servidor de petición/respuesta**. El cliente realiza una solicitud (`GET`, `POST`, `PUT`, `PATCH` o `DELETE`) y el servidor responde con un código de estado y, normalmente, un JSON. En IoT, un dispositivo puede enviar mediciones mediante `POST`, pero el cliente debe volver a consultar para detectar cambios nuevos.
 
-En SmartEgg, REST se utiliza para consultar datos y ejecutar operaciones concretas: `GET /datos`, `GET /historial`, `POST /huevo`, `POST /puerta`, consultas de alarmas/operadores y generación de reportes. Esto permite validaciones, códigos HTTP y contratos OpenAPI.
+En SmartEgg, REST se utiliza para lotes, consultas administrativas, registro de eventos de puerta y generación de reportes. No existen rutas REST para consultar o registrar telemetría; esos datos viajan por MQTT.
 
 ### 8.2 Optimizaciones HTTP
 
@@ -278,13 +268,13 @@ Estas técnicas optimizan HTTP, pero no lo convierten en un canal *push*; para a
 
 ### 8.3 MQTT en SmartEgg
 
-MQTT usa el modelo **publish/subscribe**: el backend publica en un *topic*, Mosquitto lo distribuye y Grafana/frontend reciben el mensaje sin consultarlo repetidamente. El backend es el publicador porque recibe las lecturas del microcontrolador por serial.
+MQTT usa el modelo **publish/subscribe**: el puente serial publica en los tópicos del nodo, Mosquitto los distribuye y Grafana/frontend reciben los mensajes sin consultarlos repetidamente. El backend se suscribe a la lectura completa para persistirla y publica estado y alarmas.
 
 * Temperatura y humedad: QoS 0, porque son lecturas frecuentes.
 * Actuadores, alarmas, status y puerta: QoS 1 para entrega al menos una vez.
 * Status, actuadores y alarma: mensajes `retained` para entregar el último estado a nuevos suscriptores.
 * `smartegg/SE-01/status`: LWT retenido con `estado=offline`; al conectar se publica `estado=online`.
-* Las lecturas y eventos completos permanecen en PostgreSQL; MQTT distribuye el estado en vivo, no reemplaza el historial.
+* El objeto completo de cada lectura viaja por MQTT hacia el suscriptor del backend y se conserva en PostgreSQL; el dashboard recibe el estado directamente del broker.
 
 ### 8.4 Tabla comparativa
 
@@ -297,15 +287,15 @@ MQTT usa el modelo **publish/subscribe**: el backend publica en un *topic*, Mosq
 | Desconexiones | Requiere timeout y reintentos de aplicación. | QoS, retained y LWT ayudan a recuperar estado y detectar caídas. |
 | Escalabilidad | Cada consumidor consulta al servidor. | El broker distribuye a múltiples consumidores. |
 | Historial | Requiere una base de datos externa. | `Retained` guarda solo el último estado; el histórico requiere PostgreSQL. |
-| Uso en SmartEgg | CRUD, puerta, consultas y PDF. | Telemetría, actuadores, alarmas y status para Grafana/frontend. |
+| Uso en SmartEgg | CRUD administrativo, consultas de lotes/operadores y PDF. | Telemetría, actuadores, alarmas, puerta y status para Grafana/frontend. |
 
 ### 8.5 Justificación de la arquitectura
 
 Se eligió **MQTT para telemetría y eventos** porque son mensajes pequeños y frecuentes que deben llegar en vivo a Grafana y al frontend. El broker desacopla los componentes y permite usar QoS 1, `retained` y LWT.
 
-Se eligió **REST/HTTP para CRUD y consultas** porque registrar lotes, controlar la puerta, consultar históricos y generar reportes requiere una respuesta explícita, validaciones y códigos de estado.
+Se eligió **REST/HTTP para CRUD administrativo y reportes** porque registrar lotes y consultar datos administrativos requiere una respuesta explícita, validaciones y códigos de estado. Las órdenes y estados de actuadores se envían por MQTT.
 
-Por tanto, el flujo queda separado así: **serial** entre microcontrolador y backend, **MQTT** para distribución en tiempo real, **REST/HTTP** para operaciones bajo demanda y **PostgreSQL** para persistencia histórica.
+Por tanto, el flujo queda separado así: **serial** entre microcontrolador y puente, **MQTT** para telemetría, control y distribución en tiempo real, **REST/HTTP** para operaciones administrativas y **PostgreSQL** para persistencia histórica.
 
 ## 9. Instrucciones y evidencia de la orquestación con Docker.
 

@@ -9,7 +9,7 @@ import { z } from "zod";
 import { CustomDatePicker } from "@/components/formularios/custom-date-picker";
 import { CapacityIcon, LotIcon, PlusEggIcon, TemperatureIcon } from "@/components/icons/egg-icons";
 import { useToast } from "@/components/ui/toast-provider";
-import { useSimulatedTelemetry } from "@/hooks/use-simulated-telemetry";
+import { useTelemetry } from "@/hooks/use-telemetry";
 import type { Lot } from "@/lib/types";
 
 const formSchema = z.object({
@@ -43,7 +43,7 @@ function FichaCard({ lot }: { lot: Lot }) {
 }
 
 export function FichaHuevoForm() {
-  const { addLot, capacity, occupied } = useSimulatedTelemetry();
+  const { addLot, capacity, occupied } = useTelemetry();
   const { showToast } = useToast();
   const [created, setCreated] = useState<Lot | null>(null);
   const available = Math.max(0, capacity - occupied);

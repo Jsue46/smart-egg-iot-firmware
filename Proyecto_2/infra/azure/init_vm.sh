@@ -25,7 +25,7 @@ mkdir -p /opt/smartegg
 cd /opt/smartegg
 git clone https://github.com/Jsue46/AYC2_G7.git repo || true
 cd repo/Proyecto_2
-git checkout fase3-completa || git checkout develop || true
+git checkout main
 
 # Generar variables de entorno
 cat <<EOF > .env

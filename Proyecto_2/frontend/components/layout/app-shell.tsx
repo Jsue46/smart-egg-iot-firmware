@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { MotionConfig, motion } from "motion/react";
-import { useSimulatedTelemetry } from "@/hooks/use-simulated-telemetry";
+import { useTelemetry } from "@/hooks/use-telemetry";
 import { useAuth } from "@/components/auth/auth-provider";
 import { AlarmBanner, AlarmCenter } from "@/components/alarmas/alarm-center";
 import { ROLE_LABELS, type Role } from "@/lib/auth";
@@ -90,7 +90,7 @@ function PageTitle({ pathname }: { pathname: string }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { isOnline, technician } = useSimulatedTelemetry();
+  const { isOnline, isVisionLocked, technician } = useTelemetry();
   const { user, logout } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [narrowRail, setNarrowRail] = useState(false);
@@ -165,7 +165,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
           </div>
         </header>
-        <AlarmBanner />
+        {pathname === "/dashboard" && isVisionLocked ? null : <AlarmBanner />}
         <motion.main
           id="main-content"
           tabIndex={-1}

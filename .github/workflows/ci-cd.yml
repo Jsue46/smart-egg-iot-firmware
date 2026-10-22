@@ -1,177 +1,167 @@
-name: SmartEgg CI/CD Pipeline
+name: SmartEgg CI/CD
 
 on:
-  push:
-    branches:
-      - main
-      - master
-      - fase3-completa
   pull_request:
-    branches:
-      - main
-      - master
-      - fase3-completa
+    branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  # ===============================================================
-  # 1. CI: Backend Tests & Static Analysis
-  # ===============================================================
-  ci-backend:
-    name: Backend & ML Tests
+  validate:
+    name: Validate and test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-          cache: 'pip'
+          python-version: "3.12"
+          cache: pip
 
-      - name: Install Dependencies
+      - name: Install backend and ML dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r Proyecto_2/backend/requirements.txt
-          pip install -r Proyecto_2/ml/requirements.txt
+          pip install -r Proyecto_2/backend/requirements.txt -r Proyecto_2/ml/requirements.txt
 
-      - name: Syntax & Compilation Check
-        run: |
-          python -m py_compile Proyecto_2/backend/*.py
+      - name: Check Python syntax
+        run: python -m py_compile Proyecto_2/backend/*.py
 
-      - name: Execute Backend & Model Unit Tests
-        run: |
-          cd Proyecto_2
-          python -m unittest backend/tests/test_backend.py
+      - name: Run backend tests
+        working-directory: Proyecto_2
+        run: python -m unittest discover -s backend/tests -p 'test_*.py' -v
 
-  # ===============================================================
-  # 2. CI: Frontend Build & Type Validation
-  # ===============================================================
-  ci-frontend:
-    name: Frontend Build & Validation
+      - name: Validate Docker Compose configuration
+        working-directory: Proyecto_2
+        run: docker compose config --quiet
+
+  build:
+    name: Build frontend
+    needs: validate
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
+          cache: npm
           cache-dependency-path: Proyecto_2/frontend/package-lock.json
 
-      - name: Install Frontend Dependencies
+      - name: Install frontend dependencies
         working-directory: Proyecto_2/frontend
         run: npm ci --ignore-scripts
 
-      - name: Validate TypeScript & Next.js Production Build
+      - name: Type-check and build Next.js
         working-directory: Proyecto_2/frontend
         env:
           NEXT_PUBLIC_API_URL: http://localhost:5000
           NEXT_PUBLIC_MQTT_WS_URL: ws://localhost:9001
           NEXT_PUBLIC_NODE_ID: SE-01
-          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_P5_DASHBOARD_URL: /visualizacion_p5.html
+          NEXT_TELEMETRY_DISABLED: "1"
         run: |
+          npm run lint
           npm run build
 
-  # ===============================================================
-  # 3. CI: Docker Compose Integrity Check
-  # ===============================================================
-  ci-docker:
-    name: Docker Compose Validation
+  deploy:
+    name: Deploy to Azure VM
+    needs: build
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
+    outputs:
+      vm_host: ${{ steps.configure_ssh.outputs.vm_host }}
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate Docker Compose Config
-        working-directory: Proyecto_2
-        run: |
-          docker compose config
-
-  # ===============================================================
-  # 4. CD: Automated Deployment to Azure Cloud VM
-  # ===============================================================
-  cd-deploy:
-    name: Continuous Deployment to Azure VM
-    needs: [ci-backend, ci-frontend, ci-docker]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fase3-completa' || github.ref == 'refs/heads/master')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Check Deployment Credentials
-        if: ${{ secrets.AZURE_VM_SSH_KEY == '' }}
-        run: |
-          echo "::warning ::Secret AZURE_VM_SSH_KEY is not configured in GitHub repository secrets. Deployment step skipped. Please add AZURE_VM_SSH_KEY to repository secrets to enable automated deployment."
-
-      - name: Setup SSH Authentication
-        if: ${{ secrets.AZURE_VM_SSH_KEY != '' }}
+      - name: Configure SSH and require deployment key
+        id: configure_ssh
         env:
-          SSH_KEY: ${{ secrets.AZURE_VM_SSH_KEY }}
-          VM_HOST: ${{ secrets.AZURE_VM_HOST || '23.101.175.40' }}
+          SSH_PRIVATE_KEY: ${{ secrets.AZURE_VM_SSH_KEY }}
+          VM_HOST: 23.101.175.40
         run: |
+          set -euo pipefail
+          if [[ -z "$SSH_PRIVATE_KEY" ]]; then
+            echo "::error::Missing repository secret AZURE_VM_SSH_KEY; production deployment cannot continue."
+            exit 1
+          fi
+
           mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/id_rsa
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "$VM_HOST" >> ~/.ssh/known_hosts
+          ssh-keygen -y -f ~/.ssh/id_rsa >/dev/null
+          ssh-keyscan -T 10 -H "$VM_HOST" >> ~/.ssh/known_hosts
+          echo "vm_host=$VM_HOST" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy Release Package to Azure VM
-        if: ${{ secrets.AZURE_VM_SSH_KEY != '' }}
+      - name: Transfer release and restart Docker services
         env:
-          VM_HOST: ${{ secrets.AZURE_VM_HOST || '23.101.175.40' }}
-          VM_USER: ${{ secrets.AZURE_VM_USER || 'azureuser' }}
+          VM_HOST: 23.101.175.40
+          VM_USER: azureuser
         run: |
-          echo "Compressing Proyecto_2..."
-          cd Proyecto_2
-          tar --exclude='node_modules' --exclude='.next' --exclude='__pycache__' --exclude='.git' -czf /tmp/deploy.tar.gz .
+          set -euo pipefail
+          tar \
+            --exclude='node_modules' \
+            --exclude='.next' \
+            --exclude='__pycache__' \
+            --exclude='.git' \
+            --exclude='.env' \
+            -czf /tmp/smartegg-release.tar.gz \
+            -C Proyecto_2 .
 
-          echo "Transferring release archive to Azure VM..."
-          scp -i ~/.ssh/id_rsa /tmp/deploy.tar.gz $VM_USER@$VM_HOST:/tmp/deploy.tar.gz
+          scp -i ~/.ssh/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            /tmp/smartegg-release.tar.gz \
+            "$VM_USER@$VM_HOST:/tmp/smartegg-release.tar.gz"
 
-          echo "Applying deployment on Azure VM..."
-          ssh -i ~/.ssh/id_rsa $VM_USER@$VM_HOST << 'EOF'
-            set -e
-            APP_DIR="/opt/smartegg/app"
-            mkdir -p $APP_DIR
+          ssh -i ~/.ssh/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$VM_USER@$VM_HOST" 'bash -s' <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          APP_DIR="/opt/smartegg/repo/Proyecto_2"
+          mkdir -p "$APP_DIR"
+          tar -xzf /tmp/smartegg-release.tar.gz -C "$APP_DIR"
+          rm -f /tmp/smartegg-release.tar.gz
+          cd "$APP_DIR"
+          docker compose up -d --build --remove-orphans
+          docker compose ps
+          REMOTE_SCRIPT
 
-            # Preserve existing .env configuration
-            if [ -f "$APP_DIR/.env" ]; then
-              cp "$APP_DIR/.env" /tmp/smartegg.env.bak
-            fi
-
-            # Unpack release
-            tar -xzf /tmp/deploy.tar.gz -C $APP_DIR
-            rm -f /tmp/deploy.tar.gz
-
-            # Restore existing .env
-            if [ -f "/tmp/smartegg.env.bak" ]; then
-              cp /tmp/smartegg.env.bak "$APP_DIR/.env"
-              rm -f /tmp/smartegg.env.bak
-            fi
-
-            cd $APP_DIR
-            echo "Rebuilding and restarting Docker containers..."
-            docker compose down --remove-orphans || true
-            docker compose up -d --build
-
-            echo "Pruning unused Docker images..."
-            docker image prune -f || true
-
-            echo "Deployment finished."
-          EOF
-
-      - name: Verify Live Service Health
-        if: ${{ secrets.AZURE_VM_SSH_KEY != '' }}
+  health-check:
+    name: Check deployed services
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for frontend and backend health
         env:
-          VM_HOST: ${{ secrets.AZURE_VM_HOST || '23.101.175.40' }}
+          VM_HOST: ${{ needs.deploy.outputs.vm_host }}
         run: |
-          echo "Waiting for services to initialize..."
-          sleep 12
-          echo "Checking Frontend HTTP Status..."
-          curl -s -f -o /dev/null -w "Frontend HTTP Code: %{http_code}\n" http://$VM_HOST:3001/login || echo "Frontend ping finished"
-          echo "Checking Backend API Status..."
-          curl -s -f -o /dev/null -w "Backend HTTP Code: %{http_code}\n" http://$VM_HOST:5000/health || echo "Backend ping finished"
+          set -euo pipefail
+
+          wait_for_http() {
+            local service="$1"
+            local url="$2"
+            local attempt response
+
+            for attempt in {1..12}; do
+              if response=$(curl --connect-timeout 5 --max-time 10 --silent --show-error \
+                --fail --output /dev/null --write-out '%{http_code}' "$url"); then
+                echo "$service is healthy (HTTP $response)."
+                return 0
+              fi
+              echo "$service is not ready (attempt $attempt/12); retrying in 5 seconds."
+              sleep 5
+            done
+
+            echo "::error::$service did not become healthy at $url."
+            return 1
+          }
+
+          wait_for_http "Frontend" "http://${VM_HOST}:3001/login"
+          wait_for_http "Backend" "http://${VM_HOST}:5000/health"

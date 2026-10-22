@@ -121,9 +121,9 @@ Si se reentrena, hay que volver a construir el servicio: `docker compose up -d -
 
 ## 8. Aviso al equipo (restricciones de la rúbrica)
 
-El enunciado de la Fase 3 prohíbe usar API REST para controlar sensores y actuadores (−100 %). Hoy el repo todavía usa REST en estos puntos:
-- `serial_bridge.py` envía datos con `post_rest("/datos")` y `post_rest("/puerta")`.
-- El frontend controla la puerta con `POST /puerta` y consulta `/datos` por HTTP.
+El enunciado de la Fase 3 exige MQTT como canal de telemetría y control. El flujo actual queda así:
+- `serial_bridge.py` publica la telemetría por MQTT, incluida la lectura completa en `smartegg/{NODE_ID}/sensores/lectura`; el suscriptor MQTT del backend la persiste en PostgreSQL. El registro administrativo de accesos físicos se conserva por `POST /puerta`.
+- El frontend recibe telemetría y órdenes de control mediante MQTT sobre WebSockets. REST queda para lotes y otras operaciones administrativas; no se usa para consultar o enviar lecturas.
 
 El módulo ML no depende de ninguno de esos endpoints, pero el sistema completo debe migrar su control a MQTT antes de la calificación.
 

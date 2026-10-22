@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { useSimulatedTelemetry } from "@/hooks/use-simulated-telemetry";
+import { useTelemetry } from "@/hooks/use-telemetry";
 import { useToast } from "@/components/ui/toast-provider";
 import { AlarmIcon, CloseIcon } from "@/components/icons/egg-icons";
 import { isAlarmSoundEnabled, playAlarmSound, setAlarmSoundEnabled, unlockAudio } from "@/lib/sounds";
@@ -15,7 +15,7 @@ function toastTone(alarm: Alarm) {
 }
 
 export function AlarmCenter() {
-  const { alarms, isAlarm } = useSimulatedTelemetry();
+  const { alarms, isAlarm } = useTelemetry();
   const { showToast } = useToast();
   const [open, setOpen] = useState(false);
   const [muted, setMuted] = useState(() => !isAlarmSoundEnabled());
@@ -164,7 +164,7 @@ export function AlarmCenter() {
 }
 
 export function AlarmBanner() {
-  const { isAlarm, alarms } = useSimulatedTelemetry();
+  const { isAlarm, alarms } = useTelemetry();
   const [dismissed, setDismissed] = useState(false);
   const latestActive = alarms.find((alarm) => alarm.active === true);
 

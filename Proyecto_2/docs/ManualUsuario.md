@@ -74,18 +74,15 @@ El Panel concentra las lecturas actuales de la incubadora.
 
 Las tarjetas presentan los valores y su estado operativo; las tendencias históricas se consultan en los gráficos de Chart.js ubicados debajo.
 
-#### Cámara de incubación interactiva
+#### Dashboard interactivo p5.js
 
-La sección **Cámara de incubación interactiva (p5.js)** muestra una representación 2D de la incubadora:
+En el encabezado del Panel, selecciona **Abrir dashboard p5.js**. Se abrirá en una pestaña nueva una interfaz de monitoreo independiente.
 
-- La bandeja circular cambia de posición según el ángulo del servomotor.
-- Los huevos se representan según la ocupación reportada.
-- Las partículas animadas representan el comportamiento visual de la humedad.
-- El foco calefactor y el ventilador muestran sus estados `ON` u `OFF`.
-- La escena modifica su ambiente visual según la temperatura.
-- Si existe una condición crítica, aparece una alerta visual en la escena.
-
-La visualización se actualiza consultando periódicamente el endpoint `GET /datos` del backend. Si la API no está disponible, el indicador cambia a estado desconectado y la escena conserva temporalmente la última lectura conocida.
+- Los botones **Temperatura**, **Humedad** y **Potencia** cambian la gráfica 2D dibujada con p5.js.
+- Al pasar el cursor sobre la gráfica, se resalta una lectura y se muestra su valor.
+- Las tarjetas laterales muestran las lecturas ambientales, la clasificación de visión, el resultado de ML, los actuadores y el consumo.
+- El límite de potencia y el temporizador publican sus ajustes al broker MQTT. El botón de restablecimiento publica la orden MQTT para retirar un bloqueo.
+- Si aún no llegan datos, la interfaz muestra **—** o un mensaje de espera. El indicador de la parte superior informa si MQTT está conectado.
 
 **Evidencia del Panel y la vista ampliada:**
 
@@ -93,14 +90,14 @@ La visualización se actualiza consultando periódicamente el endpoint `GET /dat
 
 ![Vista ampliada del modelo 3D](imagenes/frontend-3d-ampliado.png)
 
-#### Analítica histórica con Chart.js
+#### Tendencias recientes con Chart.js
 
 Debajo de las tarjetas se muestran dos gráficos:
 
-- **Historial térmico y humedad relativa:** gráfico de líneas con las últimas lecturas de temperatura y humedad.
+- **Tendencia de temperatura y humedad relativa:** gráfico de líneas con las últimas lecturas recibidas.
 - **Capacidad utilizada en bandeja:** gráfico de barras con la cantidad de huevos ocupados. El valor se obtiene a partir de `3 - espacios_libres`.
 
-Los gráficos consultan `GET /historial?limit=100` y se actualizan automáticamente cada cuatro segundos. Las etiquetas de los puntos muestran la hora de cada lectura cuando el timestamp es válido.
+Los gráficos muestran las lecturas recientes que llegan por MQTT y se actualizan al recibir nuevos mensajes. Las etiquetas de los puntos muestran la hora de cada lectura cuando el timestamp es válido.
 
 #### Pausar la telemetría
 
@@ -155,7 +152,7 @@ Cuando llega una alarma nueva:
 1. La interfaz muestra el banner **ALARMA ACTIVA**.
 2. El icono de alarmas indica la cantidad de eventos sin leer.
 3. Se presenta una notificación emergente (*Toast*) y, si el sonido está habilitado, se reproduce una señal audible.
-4. En la visualización p5.js puede aparecer el marco de alerta correspondiente.
+4. En el dashboard p5.js aparece el estado de bloqueo y la acción para solicitar el desbloqueo por MQTT.
 
 Desde el centro de alarmas puede:
 
@@ -217,9 +214,9 @@ Use **Actualizar** para volver a consultar la información del backend. Desde el
 ### 11.10 Estados de conexión y solución de problemas
 
 - **Nodo desconectado:** confirme que el backend esté activo y revise `docker compose logs backend`.
-- **Sin lecturas:** confirme que el Arduino esté conectado o que el modo simulado esté habilitado en la configuración del entorno.
+- **Sin lecturas:** confirme que el Arduino esté conectado al puente serial, que el puente esté ejecutándose y que el broker MQTT esté disponible. Para pruebas locales, también puede habilitarse el modo simulado.
 - **No se puede abrir la puerta:** verifique que el usuario sea un operador y que el nodo aparezca en línea.
-- **Gráficos sin datos:** compruebe que existan lecturas en el endpoint `/historial` y que el backend tenga conexión con la base de datos.
+- **Gráficos sin datos:** compruebe que el nodo publique telemetría y que el frontend pueda conectarse al broker MQTT por WebSockets (puerto 9001).
 - **Grafana no carga:** confirme que el contenedor de Grafana esté activo y que el puerto `3000` no esté ocupado por otro servicio.
 - **Acceso denegado a una sección:** cierre sesión e ingrese con el rol requerido. La navegación se filtra automáticamente según los permisos.
 

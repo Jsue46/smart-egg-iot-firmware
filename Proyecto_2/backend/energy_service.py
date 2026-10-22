@@ -47,6 +47,7 @@ T_ML = f"{BASE_TOPIC}/ml/anomalia"
 T_BLOQUEO = f"{BASE_TOPIC}/control/bloqueo"
 T_ENERGIA_PUB = f"{BASE_TOPIC}/energia/consumo"
 T_ENERGIA_CMD = f"{BASE_TOPIC}/control/energia"
+T_ACTUADORES_CMD = f"{BASE_TOPIC}/control/actuadores"
 
 VOLTAJE_NOMINAL = 120.0
 POTENCIA_BASE_WATTS = 3.0
@@ -72,6 +73,8 @@ class GestorEnergiaInteligente:
         # Parametros configurables
         self.limite_potencia_watts = 80.0
         self.temporizador_fin: float | None = None
+        self._orden_actuadores_pendiente: tuple[int, str, str] | None = None
+        self._orden_actuadores_secuencia = 0
         self.horario_inicio: int | None = None  # hora 0-23
         self.horario_fin: int | None = None
 
@@ -126,11 +129,9 @@ class GestorEnergiaInteligente:
             temporizador_activo = False
             segundos_restantes = 0
             if self.temporizador_fin is not None:
-                segundos_restantes = max(0, int(self.temporizador_fin - time.time()))
-                temporizador_activo = True
-                if segundos_restantes == 0:
-                    LOGGER.info("Temporizador de conexion cumplido; desconectando actuadores.")
-                    self.temporizador_fin = None
+                tiempo_restante = self.temporizador_fin - time.time()
+                segundos_restantes = max(0, int(tiempo_restante))
+                temporizador_activo = tiempo_restante > 0
 
             return {
                 "nodo_id": self.node_id,
@@ -149,6 +150,35 @@ class GestorEnergiaInteligente:
                 "segundos_restantes": segundos_restantes,
                 "timestamp": now_iso(),
             }
+
+    def _encolar_orden_actuadores(self, accion: str, motivo: str) -> None:
+        self._orden_actuadores_secuencia += 1
+        self._orden_actuadores_pendiente = (
+            self._orden_actuadores_secuencia,
+            accion,
+            motivo,
+        )
+
+    def procesar_vencimiento_temporizador(self) -> tuple[int, str, str] | None:
+        """Queue an actuator shutdown when the configured timer expires."""
+        with self._lock:
+            if (
+                self.temporizador_fin is not None
+                and time.time() >= self.temporizador_fin
+            ):
+                self.temporizador_fin = None
+                self._encolar_orden_actuadores("APAGAR", "temporizador_vencido")
+                LOGGER.info("Temporizador cumplido; se enviara orden MQTT para apagar actuadores.")
+            return self._orden_actuadores_pendiente
+
+    def confirmar_orden_actuadores(self, secuencia: int) -> None:
+        """Clear a queued command only if it is still the latest one."""
+        with self._lock:
+            if (
+                self._orden_actuadores_pendiente
+                and self._orden_actuadores_pendiente[0] == secuencia
+            ):
+                self._orden_actuadores_pendiente = None
 
     def actualizar_actuadores(self, data: dict[str, Any]) -> None:
         with self._lock:
@@ -171,9 +201,37 @@ class GestorEnergiaInteligente:
                 if minutos > 0:
                     self.temporizador_fin = time.time() + (minutos * 60)
                     LOGGER.info("Temporizador programado por %.1f minutos", minutos)
+                    self._encolar_orden_actuadores("REANUDAR", "temporizador_programado")
                 else:
                     self.temporizador_fin = None
                     LOGGER.info("Temporizador cancelado")
+                    self._encolar_orden_actuadores("REANUDAR", "temporizador_cancelado")
+
+
+def publicar_orden_actuadores(client, accion: str, motivo: str) -> bool:
+    """Publish a one-shot actuator command and report whether MQTT queued it."""
+    if not client.is_connected():
+        LOGGER.debug("MQTT desconectado; se reintentara la orden %s al reconectar", accion)
+        return False
+
+    payload = {
+        "nodo_id": NODE_ID,
+        "accion": accion,
+        "motivo": motivo,
+        "timestamp": now_iso(),
+    }
+    result = client.publish(
+        T_ACTUADORES_CMD,
+        json.dumps(payload, ensure_ascii=False),
+        qos=1,
+        retain=True,
+    )
+    if result.rc != mqtt.MQTT_ERR_SUCCESS:
+        LOGGER.warning("No se pudo publicar la orden %s: rc=%s", accion, result.rc)
+        return False
+
+    LOGGER.info("Orden de actuadores publicada por MQTT: %s (%s)", accion, motivo)
+    return True
 
 
 def guardar_medicion_energia_db(datos: dict[str, Any]) -> None:
@@ -313,13 +371,24 @@ def main():
 
     client.on_connect = on_connect
     client.on_message = on_message
+    client.reconnect_delay_set(min_delay=1, max_delay=30)
 
     LOGGER.info("Iniciando servicio de energia inteligente hacia %s:%d...", MQTT_HOST, MQTT_PORT)
-    client.connect(MQTT_HOST, MQTT_PORT, 60)
     client.loop_start()
+    client.connect_async(MQTT_HOST, MQTT_PORT, 60)
 
     try:
         while True:
+            orden_actuadores = gestor.procesar_vencimiento_temporizador()
+            if orden_actuadores:
+                secuencia, accion, motivo = orden_actuadores
+                if publicar_orden_actuadores(
+                    client,
+                    accion,
+                    motivo,
+                ):
+                    gestor.confirmar_orden_actuadores(secuencia)
+
             datos_energia = gestor.calcular_potencia()
 
             # Publicar en MQTT

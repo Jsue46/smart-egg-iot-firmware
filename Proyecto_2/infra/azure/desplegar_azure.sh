@@ -16,18 +16,20 @@ az group create --name "$RESOURCE_GROUP" --location "$LOCATION" -o none
 
 az network nsg create --resource-group "$RESOURCE_GROUP" --name nsg-smartegg --location "$LOCATION" -o none
 
-for port in 22 1883 9001 3000 5000 80; do
+priority=1000
+for port in 22 1883 9001 3000 3001 5000 80; do
   az network nsg rule create \
     --resource-group "$RESOURCE_GROUP" \
     --nsg-name nsg-smartegg \
     --name "Allow-$port" \
-    --priority $((1000 + port)) \
+    --priority "$priority" \
     --destination-port-ranges "$port" \
     --protocol Tcp \
     --access Allow \
     --direction Inbound \
     --source-address-prefixes '*' \
     -o none
+  priority=$((priority + 10))
 done
 
 VM_INFO=$(az vm create \

@@ -1,24 +1,24 @@
-"""Serial-to-MQTT and REST Tunnel for Windows Docker Compose deployment.
+"""Serial-to-MQTT bridge for Windows Docker Compose deployment.
 
 Reads Arduino Mega COM port on Windows host and forwards telemetry and door
-events to both the Mosquitto MQTT container (port 1883) and the Backend API
-container (port 5000) running inside Docker Compose.
+events to the Mosquitto MQTT broker. The backend subscribes to the complete
+reading topic and persists telemetry without an HTTP ingestion endpoint.
 """
 
+import argparse
 import json
 import os
-import sys
-import time
 import urllib.request
+from datetime import datetime, timezone
+import paho.mqtt.client as mqtt
 import serial
 import serial.tools.list_ports
-import argparse
-import paho.mqtt.client as mqtt
 
 DEFAULT_MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 DEFAULT_MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 API_URL = os.getenv("API_URL", "http://localhost:5000")
 NODE_ID = os.getenv("NODE_ID", "SE-01")
+ACTUATOR_CONTROL_TOPIC = f"smartegg/{NODE_ID}/control/actuadores"
 
 
 def encontrar_puerto() -> str:
@@ -33,6 +33,7 @@ def encontrar_puerto() -> str:
 
 
 def post_rest(endpoint: str, payload_dict: dict) -> None:
+    """Persist administrative events that are also announced over MQTT."""
     try:
         data = json.dumps(payload_dict).encode("utf-8")
         req = urllib.request.Request(
@@ -44,6 +45,33 @@ def post_rest(endpoint: str, payload_dict: dict) -> None:
         urllib.request.urlopen(req, timeout=1.5)
     except Exception:
         pass
+
+
+def reenviar_comando_control(topic: str, payload: dict, serial_conn) -> bool:
+    """Translate MQTT control messages into commands understood by Arduino."""
+    if serial_conn is None or not serial_conn.is_open:
+        return False
+
+    command = None
+    if topic.endswith("/control/bloqueo"):
+        command = (
+            b"CMD:BLOQUEAR\n"
+            if payload.get("bloquear")
+            else b"CMD:DESBLOQUEAR\n"
+        )
+    elif topic == ACTUATOR_CONTROL_TOPIC:
+        action = str(payload.get("accion", "")).upper()
+        if action == "APAGAR":
+            command = b"CMD:APAGAR_ACTUADORES\n"
+        elif action == "REANUDAR":
+            command = b"CMD:REANUDAR_ACTUADORES\n"
+
+    if command is None:
+        return False
+
+    serial_conn.write(command)
+    print(f" [CONTROL MQTT -> SERIAL] Comando enviado a Arduino: {command.decode().strip()}")
+    return True
 
 
 def main():
@@ -66,32 +94,21 @@ def main():
 
     def on_mqtt_message(_client, _userdata, msg):
         try:
-            if "bloqueo" in msg.topic:
-                payload = json.loads(msg.payload.decode("utf-8"))
-                if ser and ser.is_open:
-                    if payload.get("bloquear"):
-                        ser.write(b"CMD:BLOQUEAR\n")
-                        print(" [CONTROL MQTT -> SERIAL] Orden BLOQUEAR enviada a Arduino.")
-                    else:
-                        ser.write(b"CMD:DESBLOQUEAR\n")
-                        print(" [CONTROL MQTT -> SERIAL] Orden DESBLOQUEAR enviada a Arduino.")
+            payload = json.loads(msg.payload.decode("utf-8"))
+            if isinstance(payload, dict):
+                reenviar_comando_control(msg.topic, payload, ser)
         except Exception as err:
             print(f"Error procesando comando MQTT hacia serial: {err}")
 
     client.on_message = on_mqtt_message
 
     try:
-        client.connect(mqtt_host, mqtt_port, 60)
-        client.subscribe(f"smartegg/{NODE_ID}/control/#", qos=1)
-        client.loop_start()
-        print(f"Conectado exitosamente al broker Mosquitto en {mqtt_host}:{mqtt_port}.")
-    except Exception as e:
-        print(f"Error conectando a Mosquitto en Docker: {e}")
-        sys.exit(1)
-
-    try:
         with serial.Serial(puerto, 9600, timeout=2) as ser_conn:
             ser = ser_conn
+            client.connect(mqtt_host, mqtt_port, 60)
+            client.subscribe(f"smartegg/{NODE_ID}/control/#", qos=1)
+            client.loop_start()
+            print(f"Conectado exitosamente al broker Mosquitto en {mqtt_host}:{mqtt_port}.")
             print(f"Escuchando puerto {puerto}... Enviando datos a Docker.\n")
             while True:
                 linea = ser.readline().decode("utf-8", errors="ignore").strip()
@@ -102,23 +119,32 @@ def main():
                     payload = {"accion": "ABRIR", "nodo_id": NODE_ID, "operador_id": 1, "cantidad_huevos": 0}
                     client.publish(f"smartegg/{NODE_ID}/puerta/evento", json.dumps(payload), qos=1)
                     post_rest("/puerta", payload)
-                    print(" [RFID] Acceso concedido -> Enviado a Docker (MQTT & PostgreSQL) [ABRIR]")
+                    print(" [RFID] Acceso concedido -> Evento enviado por MQTT y registrado [ABRIR]")
 
                 elif "PUERTA CERRADA" in linea:
                     payload = {"accion": "CERRAR", "nodo_id": NODE_ID, "operador_id": 1, "cantidad_huevos": 0}
                     client.publish(f"smartegg/{NODE_ID}/puerta/evento", json.dumps(payload), qos=1)
                     post_rest("/puerta", payload)
-                    print(" [PUERTA] Cierre detectado -> Enviado a Docker (MQTT & PostgreSQL) [CERRAR]")
+                    print(" [PUERTA] Cierre detectado -> Evento enviado por MQTT y registrado [CERRAR]")
 
                 elif linea.startswith("{"):
                     try:
                         data = json.loads(linea)
-                        client.publish(f"smartegg/{NODE_ID}/sensores/temperatura", json.dumps({"nodo_id": NODE_ID, "valor": data["temperatura"], "unidad": "°C"}))
-                        client.publish(f"smartegg/{NODE_ID}/sensores/humedad", json.dumps({"nodo_id": NODE_ID, "valor": data["humedad"], "unidad": "%"}))
+                        data["nodo_id"] = str(data.get("nodo_id") or NODE_ID)
+                        data.setdefault("timestamp", datetime.now(timezone.utc).isoformat())
+                        base = {"nodo_id": data["nodo_id"], "timestamp": data["timestamp"]}
+                        client.publish(
+                            f"smartegg/{NODE_ID}/sensores/temperatura",
+                            json.dumps({**base, "valor": data["temperatura"], "unidad": "°C"}),
+                        )
+                        client.publish(
+                            f"smartegg/{NODE_ID}/sensores/humedad",
+                            json.dumps({**base, "valor": data["humedad"], "unidad": "%"}),
+                        )
                         client.publish(
                             f"smartegg/{NODE_ID}/actuadores/estado",
                             json.dumps({
-                                "nodo_id": NODE_ID,
+                                **base,
                                 "foco": data.get("foco", "OFF"),
                                 "ventilador": data.get("fan", "OFF"),
                                 "rotacion_grados": data.get("rotacion_grados", 0),
@@ -127,8 +153,17 @@ def main():
                             qos=1,
                             retain=True
                         )
-                        post_rest("/datos", data)
-                        print(f" Telemetría enviada a Docker: Temp={data['temperatura']}°C Hum={data['humedad']}% Foco={data.get('foco')} Fan={data.get('fan')}")
+                        client.publish(
+                            f"smartegg/{NODE_ID}/sensores/lectura",
+                            json.dumps(data, ensure_ascii=False),
+                            qos=1,
+                            retain=False,
+                        )
+                        print(
+                            f" Telemetría MQTT: Temp={data['temperatura']}°C "
+                            f"Hum={data['humedad']}% Foco={data.get('foco')} "
+                            f"Fan={data.get('fan')}"
+                        )
                     except Exception:
                         pass
     except KeyboardInterrupt:

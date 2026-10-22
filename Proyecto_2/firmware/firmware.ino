@@ -65,6 +65,7 @@ const int switchPines[3] = {A0, A1, A2};
 const int TOTAL_ESPACIOS = 3;
 
 bool sistemaBloqueado = false; // Bloqueo de seguridad activado por IA de vision
+bool actuadoresApagadosPorTemporizador = false;
 
 DHT dht(DHTPIN, DHTTYPE);
 Servo eggServo;
@@ -249,6 +250,19 @@ void loop() {
       lcd.setCursor(0, 1);
       lcd.print("OBJETO INVALIDO");
       Serial.println(F("[SEGURIDAD] Incubadora BLOQUEADA por orden de vision"));
+    } else if (cmd == "CMD:APAGAR_ACTUADORES") {
+      actuadoresApagadosPorTemporizador = true;
+      digitalWrite(RELAY_PIN, RELE_OFF);
+      digitalWrite(FAN_PIN, LOW);
+      eggServo.detach();
+      Serial.println(F("[ENERGIA] Actuadores apagados por temporizador MQTT"));
+    } else if (cmd == "CMD:REANUDAR_ACTUADORES") {
+      if (actuadoresApagadosPorTemporizador) {
+        actuadoresApagadosPorTemporizador = false;
+        eggServo.attach(SERVO_PIN, 544, 2400);
+        eggServo.write(servoAngle);
+      }
+      Serial.println(F("[ENERGIA] Control automatico de actuadores reanudado"));
     } else if (cmd == "CMD:DESBLOQUEAR" || cmd == "DESBLOQUEAR") {
       sistemaBloqueado = false;
       digitalWrite(LED_BLOQUEO_PIN, LOW);
@@ -348,7 +362,7 @@ void loop() {
   // -------------------------------------------------------------
   // TAREA 1: SERVO MOTOR
   // -------------------------------------------------------------
-  if (currentMillis - previousServoTime >= servoInterval) {
+  if (!actuadoresApagadosPorTemporizador && currentMillis - previousServoTime >= servoInterval) {
     previousServoTime = currentMillis;
     if (servoDerecha) {
       servoAngle = 45;
@@ -392,15 +406,25 @@ void loop() {
 
     // Control Foco
     static bool focoState = false;
-    if (temperatura < (TEMP_OBJETIVO - HISTERESIS))      focoState = true;
-    else if (temperatura > (TEMP_OBJETIVO + HISTERESIS)) focoState = false;
+    if (actuadoresApagadosPorTemporizador) {
+      focoState = false;
+    } else if (temperatura < (TEMP_OBJETIVO - HISTERESIS)) {
+      focoState = true;
+    } else if (temperatura > (TEMP_OBJETIVO + HISTERESIS)) {
+      focoState = false;
+    }
     digitalWrite(RELAY_PIN, focoState ? RELE_ON : RELE_OFF);
     const char* estadoFoco = focoState ? "ON" : "OFF";
 
     // Control Ventilador
     static bool fanState = false;
-    if (temperatura >= TEMP_FAN_ON)       fanState = true;
-    else if (temperatura <= TEMP_FAN_OFF) fanState = false;
+    if (actuadoresApagadosPorTemporizador) {
+      fanState = false;
+    } else if (temperatura >= TEMP_FAN_ON) {
+      fanState = true;
+    } else if (temperatura <= TEMP_FAN_OFF) {
+      fanState = false;
+    }
     digitalWrite(FAN_PIN, fanState ? HIGH : LOW);
     const char* estadoFan = fanState ? "ON" : "OFF";
 

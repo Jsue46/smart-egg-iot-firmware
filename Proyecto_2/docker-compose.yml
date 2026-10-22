@@ -121,6 +121,7 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5000}
         NEXT_PUBLIC_MQTT_WS_URL: ${NEXT_PUBLIC_MQTT_WS_URL:-ws://localhost:9001}
         NEXT_PUBLIC_NODE_ID: ${NODE_ID:-SE-01}
+        NEXT_PUBLIC_P5_DASHBOARD_URL: ${NEXT_PUBLIC_P5_DASHBOARD_URL:-/visualizacion_p5.html}
     restart: unless-stopped
     depends_on:
       backend:
