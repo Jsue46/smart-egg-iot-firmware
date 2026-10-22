@@ -174,4 +174,4 @@ jobs:
           echo "Checking Frontend HTTP Status..."
           curl -s -f -o /dev/null -w "Frontend HTTP Code: %{http_code}\n" http://$VM_HOST:3001/login || echo "Frontend ping finished"
           echo "Checking Backend API Status..."
-          curl -s -f -o /dev/null -w "Backend HTTP Code: %{http_code}\n" http://$VM_HOST:5000/api/nodos || echo "Backend ping finished"
+          curl -s -f -o /dev/null -w "Backend HTTP Code: %{http_code}\n" http://$VM_HOST:5000/health || echo "Backend ping finished"
