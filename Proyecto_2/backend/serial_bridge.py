@@ -19,6 +19,7 @@ DEFAULT_MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 DEFAULT_MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 API_URL = os.getenv("API_URL", "http://localhost:5000")
 NODE_ID = os.getenv("NODE_ID", "SE-01")
+ACTUATOR_CONTROL_TOPIC = f"smartegg/{NODE_ID}/control/actuadores"
 
 
 def encontrar_puerto() -> str:
@@ -46,6 +47,33 @@ def post_rest(endpoint: str, payload_dict: dict) -> None:
         pass
 
 
+def reenviar_comando_control(topic: str, payload: dict, serial_conn) -> bool:
+    """Translate MQTT control messages into commands understood by Arduino."""
+    if serial_conn is None or not serial_conn.is_open:
+        return False
+
+    command = None
+    if topic.endswith("/control/bloqueo"):
+        command = (
+            b"CMD:BLOQUEAR\n"
+            if payload.get("bloquear")
+            else b"CMD:DESBLOQUEAR\n"
+        )
+    elif topic == ACTUATOR_CONTROL_TOPIC:
+        action = str(payload.get("accion", "")).upper()
+        if action == "APAGAR":
+            command = b"CMD:APAGAR_ACTUADORES\n"
+        elif action == "REANUDAR":
+            command = b"CMD:REANUDAR_ACTUADORES\n"
+
+    if command is None:
+        return False
+
+    serial_conn.write(command)
+    print(f" [CONTROL MQTT -> SERIAL] Comando enviado a Arduino: {command.decode().strip()}")
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description="SmartEgg Serial Tunnel to MQTT")
     parser.add_argument("--mqtt-host", type=str, default=DEFAULT_MQTT_HOST, help="IP o host del broker MQTT (ej. IP de AWS/Azure)")
@@ -66,32 +94,21 @@ def main():
 
     def on_mqtt_message(_client, _userdata, msg):
         try:
-            if "bloqueo" in msg.topic:
-                payload = json.loads(msg.payload.decode("utf-8"))
-                if ser and ser.is_open:
-                    if payload.get("bloquear"):
-                        ser.write(b"CMD:BLOQUEAR\n")
-                        print(" [CONTROL MQTT -> SERIAL] Orden BLOQUEAR enviada a Arduino.")
-                    else:
-                        ser.write(b"CMD:DESBLOQUEAR\n")
-                        print(" [CONTROL MQTT -> SERIAL] Orden DESBLOQUEAR enviada a Arduino.")
+            payload = json.loads(msg.payload.decode("utf-8"))
+            if isinstance(payload, dict):
+                reenviar_comando_control(msg.topic, payload, ser)
         except Exception as err:
             print(f"Error procesando comando MQTT hacia serial: {err}")
 
     client.on_message = on_mqtt_message
 
     try:
-        client.connect(mqtt_host, mqtt_port, 60)
-        client.subscribe(f"smartegg/{NODE_ID}/control/#", qos=1)
-        client.loop_start()
-        print(f"Conectado exitosamente al broker Mosquitto en {mqtt_host}:{mqtt_port}.")
-    except Exception as e:
-        print(f"Error conectando a Mosquitto en Docker: {e}")
-        sys.exit(1)
-
-    try:
         with serial.Serial(puerto, 9600, timeout=2) as ser_conn:
             ser = ser_conn
+            client.connect(mqtt_host, mqtt_port, 60)
+            client.subscribe(f"smartegg/{NODE_ID}/control/#", qos=1)
+            client.loop_start()
+            print(f"Conectado exitosamente al broker Mosquitto en {mqtt_host}:{mqtt_port}.")
             print(f"Escuchando puerto {puerto}... Enviando datos a Docker.\n")
             while True:
                 linea = ser.readline().decode("utf-8", errors="ignore").strip()

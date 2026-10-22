@@ -68,6 +68,7 @@ El control y monitoreo opera **exclusivamente mediante MQTT**, eliminando APIs i
 | `smartegg/SE-01/ml/anomalia` | 1 | Sí | `{"nodo_id":"SE-01","anomalia":false,"score":-0.0125,"umbral":-0.0052}` | Inferencia predictiva de Isolation Forest. |
 | `smartegg/SE-01/energia/consumo` | 0 | No | `{"nodo_id":"SE-01","watts":68.5,"kwh":0.142,"limite_watts":80.0}` | Potencia instantánea y acumulación. |
 | `smartegg/SE-01/control/energia` | 1 | No | `{"limite_watts":85.0,"temporizador_minutos":30}` | Configuración dinámica de energía y timer. |
+| `smartegg/SE-01/control/actuadores` | 1 | Sí | `{"accion":"APAGAR","motivo":"temporizador_vencido"}` o `{"accion":"REANUDAR","motivo":"temporizador_programado"}` | Última orden del servicio de energía al puente serial al vencer, reprogramar o cancelar el temporizador. |
 | `smartegg/SE-01/alarmas/critica` | 1 | Sí | `{"id":"...","tipo":"BLOQUEO_SEGURIDAD_VISION","activa":true}` | Notificación de alarma crítica en Grafana. |
 
 ---

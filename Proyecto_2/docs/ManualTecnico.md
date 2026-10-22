@@ -118,6 +118,8 @@ Esta separación sigue lo recomendado para el proyecto: las alarmas viajan por e
 | `smartegg/SE-01/alarmas/critica` | 1 | Sí | Backend Flask | Grafana, Frontend | `{activa, tipo, severidad, inicio_at, resolucion_at}` |
 | `smartegg/SE-01/status` | 1 | Sí | Backend Flask (LWT Broker) | Grafana, Frontend | `{estado, valor}`; `offline`/`valor=0` es el LWT |
 | `smartegg/SE-01/puerta/evento` | 1 | No | Backend Flask | Grafana, Frontend | `{id, accion, operador_id, cantidad_huevos, timestamp}` |
+| `smartegg/SE-01/control/energia` | 1 | No | Frontend | Servicio de energía, puente serial | Límite de potencia y temporizador |
+| `smartegg/SE-01/control/actuadores` | 1 | Sí | Servicio de energía | Puente serial | Última orden: `{accion: APAGAR}` al vencer; `{accion: REANUDAR}` al programar o cancelar |
 
 * **Detalles de configuración:** Broker Mosquitto con listener TCP en puerto 1883 y listener WebSocket en puerto 9001. Documentación completa de pruebas y esquemas en `infra/mqtt/README.md`.
 
