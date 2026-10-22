@@ -8,17 +8,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 <style>
   :root {
-    --bg: #0b0f19;
-    --card: rgba(18, 24, 38, 0.85);
-    --border: #1f293d;
-    --border-accent: #2e3d5b;
-    --accent-emerald: #10b981;
-    --accent-cyan: #06b6d4;
-    --accent-amber: #f59e0b;
-    --accent-rose: #f43f5e;
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+    --bg: #f5f3ed;
+    --card: #fffefa;
+    --border: #e3e1d9;
+    --border-accent: #cadbd2;
+    --accent-emerald: #55765e;
+    --accent-cyan: #348e91;
+    --accent-amber: #e3a817;
+    --accent-rose: #ba5245;
+    --text-primary: #2e342f;
+    --text-secondary: #687269;
+    --text-muted: #81877e;
   }
 
   * { box-sizing: border-box; }
@@ -33,13 +33,13 @@
 
   /* Barra superior */
   header {
-    height: 60px;
-    background: rgba(11, 15, 25, 0.95);
-    border-bottom: 1px solid var(--border);
+    min-height: 70px;
+    background: #255f53;
+    border-bottom: 1px solid #1b5147;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 24px;
+    padding: 9px clamp(16px, 3vw, 30px);
     position: sticky;
     top: 0;
     z-index: 50;
@@ -53,13 +53,21 @@
     font-weight: 700;
     letter-spacing: -0.5px;
   }
+  .brand-mark { width: 42px; height: 48px; flex: none; display: grid; place-items: center; }
+  .brand-mark svg { display: block; width: 100%; height: 100%; }
+  .brand-mark svg path:first-child { fill: var(--accent-amber); stroke: #ffe8a5; stroke-width: 1.2; }
+  .brand-mark svg ellipse { fill: rgba(255,255,255,.24); stroke: #fff3cc; stroke-width: 1; }
+  .brand-mark svg path:last-child { fill: none; stroke: #fff3cc; stroke-width: 1.4; stroke-linecap: round; }
+  .brand-copy { display: grid; gap: 1px; color: #fffdf3; line-height: 1.1; }
+  .brand-subtitle { color: #d8e7db; font-size: 11px; font-weight: 450; letter-spacing: 0; }
   .brand-badge {
-    background: linear-gradient(135deg, #10b981, #06b6d4);
-    color: #fff;
-    padding: 3px 8px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 800;
+    color: #fff6d9;
+    padding: 5px 10px;
+    background: rgba(239, 178, 22, .15);
+    border: 1px solid rgba(255, 232, 165, .28);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 650;
   }
   .connection-bar {
     display: flex;
@@ -70,39 +78,39 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    background: rgba(16, 185, 129, 0.1);
-    border: 1px solid rgba(16, 185, 129, 0.25);
-    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    padding: 8px 14px;
     border-radius: 9999px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
-    color: #34d399;
+    color: #f4f2e6;
     cursor: pointer;
     transition: all 0.2s ease;
   }
   .mqtt-pill:hover {
-    background: rgba(16, 185, 129, 0.2);
+    background: rgba(255, 255, 255, 0.18);
   }
   .status-dot {
     width: 8px; height: 8px;
     border-radius: 50%;
-    background: #10b981;
-    box-shadow: 0 0 10px #10b981;
+    background: #a7ca8b;
+    box-shadow: 0 0 0 4px rgba(167, 202, 139, .14);
   }
   .status-dot.disconnected {
-    background: #f43f5e;
-    box-shadow: 0 0 10px #f43f5e;
+    background: #ef9a8e;
+    box-shadow: 0 0 0 4px rgba(239, 154, 142, .14);
   }
 
   /* Grid principal */
   .main-layout {
     display: grid;
-    grid-template-columns: 1fr 380px;
-    gap: 20px;
-    padding: 20px 24px;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+    gap: 18px;
+    padding: 24px clamp(16px, 3vw, 30px);
     max-width: 1600px;
     margin: 0 auto;
-    min-height: calc(100vh - 60px);
+    min-height: calc(100vh - 70px);
   }
   @media (max-width: 1024px) {
     .main-layout { grid-template-columns: 1fr; }
@@ -112,56 +120,61 @@
   .canvas-card {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: 22px;
     position: relative;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 14px 35px rgba(35, 62, 48, 0.08);
   }
   .canvas-header {
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
+    min-height: 76px;
+    padding: 15px 20px;
+    border-bottom: 1px solid #eceae3;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
   }
   .canvas-header h2 {
-    margin: 0;
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text-secondary);
+    margin: 0 0 4px;
+    color: #303831;
+    font: 500 22px/1.15 Georgia, serif;
   }
+  .canvas-header p { margin: 0; color: var(--text-muted); font-size: 12px; }
+  .chart-tabs { display: flex; align-items: center; gap: 5px; padding: 4px; background: #f1f4ee; border: 1px solid #e1e8e1; border-radius: 12px; }
+  .chart-tab { min-height: 36px; padding: 0 12px; color: #65746b; background: transparent; border: 1px solid transparent; border-radius: 9px; font-size: 13px; font-weight: 550; cursor: pointer; transition: color .18s ease, background .18s ease, border-color .18s ease; }
+  .chart-tab:hover { color: #255f53; }
+  .chart-tab.active { color: #255f53; background: #fffefa; border-color: #dbe6dc; box-shadow: 0 2px 6px rgba(36,71,50,.06); }
+  .chart-tab:focus-visible, .btn:focus-visible, .mqtt-pill:focus-visible { outline: 3px solid rgba(85,118,94,.35); outline-offset: 2px; }
   #canvas-container {
     flex: 1;
-    min-height: 480px;
+    min-height: 520px;
     width: 100%;
     position: relative;
-    background: radial-gradient(circle at center, #162032 0%, #0b0f19 75%);
+    background: #f3f7f2;
   }
-  canvas { display: block; margin: 0 auto; }
+  canvas { display: block; max-width: 100%; margin: 0 auto; }
 
   /* Panel lateral de tarjetas */
   .sidebar {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 13px;
   }
   .widget {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 16px 18px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
-    backdrop-filter: blur(8px);
+    border-radius: 17px;
+    padding: 16px 17px;
+    box-shadow: 0 6px 18px rgba(38, 43, 36, 0.045);
   }
   .widget-title {
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-muted);
-    margin-bottom: 12px;
+    font-size: 13px;
+    font-weight: 650;
+    color: #3c5145;
+    margin-bottom: 11px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -174,43 +187,53 @@
     gap: 10px;
   }
   .metric-box {
-    background: rgba(31, 41, 61, 0.5);
-    border: 1px solid var(--border-accent);
-    padding: 12px;
-    border-radius: 10px;
+    background: #f7f8f4;
+    border: 1px solid #e9ece5;
+    padding: 12px 13px;
+    border-radius: 12px;
   }
-  .metric-box .label { font-size: 11px; color: var(--text-muted); }
-  .metric-box .val { font-size: 24px; font-weight: 800; margin-top: 4px; font-family: monospace; }
-  .val-temp { color: #f59e0b; }
-  .val-hum { color: #06b6d4; }
-  .val-power { color: #10b981; }
+  .metric-box .label { font-size: 12px; color: var(--text-muted); }
+  .metric-box .val { font-size: 24px; font-weight: 650; margin-top: 5px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .val-temp { color: #9b7421; }
+  .val-hum { color: #348e91; }
+  .val-power { color: #55765e; }
+  .val-energy { color: #667b6c; }
+  .actuator-list { display: grid; gap: 2px; }
+  .actuator-row { min-height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #efeee8; }
+  .actuator-row:last-child { border-bottom: 0; }
+  .actuator-row > span { color: var(--text-secondary); font-size: 13px; }
+  .actuator-row strong { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .actuator-state { padding: 4px 9px; border: 1px solid transparent; border-radius: 999px; }
+  .actuator-state.is-on { color: #4d7452; background: #edf5ed; border-color: #c8dcc8; }
+  .actuator-state.is-off { color: #737b73; background: #f1f2ee; border-color: #e2e4de; }
+  .actuator-state.is-waiting { color: #8b681d; background: #fbf3dc; border-color: #ead7a0; }
 
   /* Vision & ML Badges */
   .badge-card {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: rgba(31, 41, 61, 0.4);
-    border: 1px solid var(--border);
+    background: #f8f8f4;
+    border: 1px solid #e8e8e1;
     padding: 10px 14px;
-    border-radius: 10px;
+    border-radius: 12px;
     margin-bottom: 8px;
   }
   .badge-card:last-child { margin-bottom: 0; }
   .badge-tag {
-    padding: 4px 10px;
+    padding: 5px 10px;
     border-radius: 6px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.3px;
   }
-  .tag-ok { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid #059669; }
-  .tag-warn { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid #d97706; }
-  .tag-danger { background: rgba(244, 63, 94, 0.2); color: #fda4af; border: 1px solid #e11d48; animation: pulseRed 1.5s infinite; }
+  .tag-ok { background: #edf5ed; color: #4d7452; border: 1px solid #c8dcc8; }
+  .tag-warn { background: #fbf3dc; color: #8b681d; border: 1px solid #ead7a0; }
+  .tag-danger { background: #fae9e5; color: #a74236; border: 1px solid #e0a39a; animation: pulseRed 1.5s infinite; }
 
   @keyframes pulseRed {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.4); }
-    50% { box-shadow: 0 0 0 6px rgba(244, 63, 94, 0); }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(186, 82, 69, 0.25); }
+    50% { box-shadow: 0 0 0 6px rgba(186, 82, 69, 0); }
   }
 
   /* Gestion de energia */
@@ -218,7 +241,7 @@
     margin-top: 10px;
   }
   .energy-slider-group label {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--text-secondary);
     display: flex;
     justify-content: space-between;
@@ -226,7 +249,7 @@
   }
   input[type=range] {
     width: 100%;
-    accent-color: #10b981;
+    accent-color: #55765e;
   }
   .timer-control {
     display: flex;
@@ -234,28 +257,29 @@
     margin-top: 12px;
   }
   .btn {
-    background: rgba(31, 41, 61, 0.8);
-    border: 1px solid var(--border-accent);
+    min-height: 42px;
+    background: #f7f8f4;
+    border: 1px solid #dce5df;
     color: var(--text-primary);
-    padding: 7px 12px;
-    border-radius: 8px;
-    font-size: 12px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
   }
-  .btn:hover { background: #2e3d5b; }
-  .btn-primary { background: #059669; border-color: #10b981; }
-  .btn-primary:hover { background: #10b981; }
-  .btn-danger { background: #dc2626; border-color: #f43f5e; }
-  .btn-danger:hover { background: #ef4444; }
+  .btn:hover { background: #edf3ef; border-color: #a9c6b8; }
+  .btn-primary { color: #fffdf3; background: #255f53; border-color: #255f53; }
+  .btn-primary:hover { background: #347565; border-color: #347565; }
+  .btn-danger { color: #fff; background: #a84438; border-color: #b64f43; }
+  .btn-danger:hover { background: #bf584a; }
 
   /* OVERLAY DE BLOQUEO DE SEGURIDAD */
   #lockOverlay {
     position: fixed;
     top: 0; left: 0;
     width: 100vw; height: 100vh;
-    background: rgba(15, 6, 12, 0.94);
+    background: rgba(32, 18, 17, 0.94);
     z-index: 1000;
     display: none;
     flex-direction: column;
@@ -271,28 +295,36 @@
     100% { box-shadow: inset 0 0 100px rgba(239, 68, 68, 0.85); }
   }
   .lock-box {
-    background: #18080c;
-    border: 2px solid #ef4444;
+    background: #fff7f4;
+    border: 2px solid #ba5245;
     border-radius: 20px;
     padding: 40px;
     max-width: 580px;
     width: 100%;
-    box-shadow: 0 0 60px rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 60px rgba(186, 82, 69, 0.2);
   }
   .lock-icon {
-    font-size: 54px;
-    margin-bottom: 12px;
+    width: 58px;
+    height: 58px;
+    display: grid;
+    place-items: center;
+    margin: 0 auto 12px;
+    color: #ba5245;
+    background: #fae9e5;
+    border: 1px solid #e5b5ad;
+    border-radius: 50% 50% 48% 48% / 60% 60% 42% 42%;
   }
+  .lock-icon svg { width: 34px; height: 34px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .lock-title {
     font-size: 24px;
     font-weight: 800;
-    color: #fca5a5;
+    color: #843a31;
     margin: 0 0 10px 0;
     letter-spacing: -0.5px;
   }
   .lock-desc {
-    color: #cbd5e1;
-    font-size: 14px;
+    color: #5f514d;
+    font-size: 15px;
     line-height: 1.5;
     margin-bottom: 24px;
   }
@@ -302,29 +334,56 @@
     position: fixed;
     top: 0; left: 0;
     width: 100vw; height: 100vh;
-    background: rgba(0,0,0,0.7);
+    background: rgba(28, 44, 37, .62);
     display: none;
     justify-content: center;
     align-items: center;
     z-index: 200;
   }
   .modal-box {
-    background: #131c2e;
-    border: 1px solid var(--border-accent);
-    border-radius: 14px;
-    padding: 24px;
+    background: #fffefa;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 25px;
     max-width: 420px;
     width: 90%;
   }
   .input-field {
     width: 100%;
     padding: 8px 12px;
-    background: #0b0f19;
+    background: #f7f8f4;
     border: 1px solid var(--border);
-    color: #fff;
+    color: var(--text-primary);
     border-radius: 6px;
     margin-top: 6px;
     margin-bottom: 14px;
+  }
+  @media (max-width: 1024px) {
+    .main-layout .sidebar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+    .main-layout .energy-widget { grid-column: 1 / -1; }
+    #canvas-container { min-height: 440px; }
+  }
+  @media (max-width: 640px) {
+    header { min-height: 64px; padding-inline: 14px; gap: 10px; }
+    .brand { gap: 8px; font-size: 16px; }
+    .brand-mark { width: 35px; height: 40px; }
+    .brand-subtitle { display: none; }
+    .brand-badge { font-size: 11px; }
+    .mqtt-pill { max-width: 45vw; padding: 7px 9px; font-size: 11px; }
+    .main-layout { gap: 14px; padding: 15px 12px 24px; }
+    .canvas-card { border-radius: 18px; }
+    .canvas-header { align-items: flex-start; flex-direction: column; padding: 15px; }
+    .canvas-header h2 { font-size: 20px; }
+    .chart-tabs { width: 100%; }
+    .chart-tab { flex: 1; min-height: 42px; padding-inline: 7px; font-size: 12px; }
+    #canvas-container { min-height: 360px; }
+    .main-layout .sidebar { grid-template-columns: 1fr; gap: 11px; }
+    .main-layout .energy-widget { grid-column: auto; }
+    .widget { padding: 15px; }
+    .timer-control { flex-wrap: wrap; }
+    .timer-control .btn { flex: 1 1 auto; }
+    .lock-box { padding: 26px 20px; }
+    .lock-title { font-size: 21px; }
   }
 </style>
 </head>
@@ -332,9 +391,9 @@
 
 <header>
   <div class="brand">
-    <span>🥚</span>
-    <span>SmartEgg <span style="color:#06b6d4;">IoT</span></span>
-    <span class="brand-badge">FASE 3 — p5.js</span>
+    <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 4.5c-7.1 0-13.4 10.8-13.4 22.3C10.6 37 16.2 43.5 24 43.5S37.4 37 37.4 26.8C37.4 15.3 31.1 4.5 24 4.5Z"/><ellipse cx="27.5" cy="20" rx="3.2" ry="5.2"/><path d="M17 29c.5 4.4 3 7 7 7"/></svg></span>
+    <span class="brand-copy">SmartEgg <small class="brand-subtitle">Incubación precisa</small></span>
+    <span class="brand-badge">p5.js</span>
   </div>
   <div class="connection-bar">
     <div class="mqtt-pill" id="mqttStatusBtn" onclick="abrirConfigModal()">
@@ -345,13 +404,17 @@
 </header>
 
 <div class="main-layout">
-  <!-- Area del Canvas Interactivo p5.js -->
+  <!-- Gráfica interactiva de telemetría p5.js -->
   <div class="canvas-card">
     <div class="canvas-header">
-      <h2>Cabina de Incubación Virtual en Tiempo Real</h2>
-      <span style="font-size: 12px; color: var(--text-muted);" id="rotacionLabel">Rotación: 45°</span>
+      <div><h2>Tendencia de telemetría</h2><p>Lecturas recibidas en vivo por MQTT</p></div>
+      <div class="chart-tabs" role="group" aria-label="Variable del gráfico">
+        <button type="button" class="chart-tab active" data-chart="temperatura" aria-pressed="true" onclick="seleccionarGrafica('temperatura')">Temperatura</button>
+        <button type="button" class="chart-tab" data-chart="humedad" aria-pressed="false" onclick="seleccionarGrafica('humedad')">Humedad</button>
+        <button type="button" class="chart-tab" data-chart="potencia" aria-pressed="false" onclick="seleccionarGrafica('potencia')">Potencia</button>
+      </div>
     </div>
-    <div id="canvas-container"></div>
+    <div id="canvas-container" role="img" aria-label="Gráfico interactivo de lecturas MQTT"></div>
   </div>
 
   <!-- Sidebar de Controles y Sensores -->
@@ -362,11 +425,11 @@
       <div class="metric-row">
         <div class="metric-box">
           <div class="label">Temperatura</div>
-          <div class="val val-temp" id="valTemp">37.5°C</div>
+          <div class="val val-temp" id="valTemp">—</div>
         </div>
         <div class="metric-box">
           <div class="label">Humedad</div>
-          <div class="val val-hum" id="valHum">58%</div>
+          <div class="val val-hum" id="valHum">—</div>
         </div>
       </div>
     </div>
@@ -377,12 +440,12 @@
       <div class="badge-card">
         <div>
           <div style="font-size:11px; color:var(--text-muted);">Clasificación del nido:</div>
-          <div style="font-weight:700; font-size:15px; margin-top:2px;" id="visionClase">HUEVO</div>
+          <div style="font-weight:700; font-size:15px; margin-top:2px;" id="visionClase">Sin lectura</div>
         </div>
-        <span class="badge-tag tag-ok" id="visionTag">98.5% CONF</span>
+        <span class="badge-tag tag-warn" id="visionTag">—</span>
       </div>
       <div style="font-size:11px; color:var(--text-secondary); margin-top:6px;" id="visionDetalle">
-        Vigilancia activa: objeto biológico verificado.
+        Esperando clasificación por MQTT.
       </div>
     </div>
 
@@ -392,26 +455,35 @@
       <div class="badge-card">
         <div>
           <div style="font-size:11px; color:var(--text-muted);">Estado del Sistema:</div>
-          <div style="font-weight:700; font-size:15px; margin-top:2px;" id="mlEstado">NORMAL</div>
+          <div style="font-weight:700; font-size:15px; margin-top:2px;" id="mlEstado">Sin lectura</div>
         </div>
-        <span class="badge-tag tag-ok" id="mlTag">Isolation Forest</span>
+        <span class="badge-tag tag-warn" id="mlTag">MQTT</span>
       </div>
       <div style="font-size:11px; color:var(--text-secondary); margin-top:6px;" id="mlDetalle">
-        Score: -0.012 (dentro del rango seguro).
+        Esperando resultado del modelo.
+      </div>
+    </div>
+
+    <div class="widget">
+      <div class="widget-title">Estado de actuadores</div>
+      <div class="actuator-list">
+        <div class="actuator-row"><span>Foco</span><strong id="stateFoco">Sin datos</strong></div>
+        <div class="actuator-row"><span>Ventilación</span><strong id="stateFan">Sin datos</strong></div>
+        <div class="actuator-row"><span>Rotación</span><strong id="stateRotation">—</strong></div>
       </div>
     </div>
 
     <!-- Gestion Inteligente de Consumo Electrico -->
-    <div class="widget">
+    <div class="widget energy-widget">
       <div class="widget-title">Gestión de Energía Eléctrica</div>
       <div class="metric-row">
         <div class="metric-box">
           <div class="label">Potencia en Vivo</div>
-          <div class="val val-power" id="valWatts">68.5 W</div>
+          <div class="val val-power" id="valWatts">—</div>
         </div>
         <div class="metric-box">
           <div class="label">Energía Acumulada</div>
-          <div class="val" style="color:#a78bfa;" id="valKwh">0.142 kWh</div>
+          <div class="val val-energy" id="valKwh">—</div>
         </div>
       </div>
 
@@ -424,11 +496,11 @@
       </div>
 
       <div class="timer-control">
-        <button class="btn btn-primary" onclick="programarTemporizador(30)">⏱ Temporizador 30 min</button>
+        <button class="btn btn-primary" onclick="programarTemporizador(30)">Programar 30 min</button>
         <button class="btn" onclick="programarTemporizador(0)">Cancelar</button>
       </div>
       <div id="timerStatus" style="font-size:11px; color:var(--text-muted); margin-top:6px;">
-        Temporizador: inactivo
+        Esperando estado MQTT
       </div>
     </div>
   </div>
@@ -437,7 +509,7 @@
 <!-- Modal de Bloqueo Critico -->
 <div id="lockOverlay">
   <div class="lock-box">
-    <div class="lock-icon">🚨</div>
+    <div class="lock-icon" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 4.5c-7.1 0-13.4 10.8-13.4 22.3C10.6 37 16.2 43.5 24 43.5S37.4 37 37.4 26.8C37.4 15.3 31.1 4.5 24 4.5Z"/><path d="M24 16.5v10M24 33h.1"/></svg></div>
     <h1 class="lock-title">¡SISTEMA BLOQUEADO!</h1>
     <div class="lock-desc" id="lockMessage">
       Se ha detectado un <strong>OBJETO EXTRAÑO</strong> dentro de la incubadora mientras el ciclo estaba en ejecución.
@@ -447,7 +519,7 @@
       <span class="badge-tag tag-danger" style="font-size:13px; padding:6px 14px;">ESTADO: BLOQUEO DE SEGURIDAD ACTIVO</span>
     </div>
     <button class="btn btn-danger" style="font-size:15px; padding:12px 28px;" onclick="enviarDesbloqueo()">
-      🔓 Restablecer y Desbloquear Sistema
+      Restablecer y desbloquear sistema
     </button>
   </div>
 </div>
@@ -476,30 +548,49 @@
 // =========================================================================
 const appState = {
   nodoId: "SE-01",
-  temperatura: 37.5,
-  humedad: 58.0,
-  foco: "ON",
-  ventilador: "OFF",
-  rotacion: 45.0,
-  espacios_libres: 1,
-  
-  // Vision
-  vision_clase: "huevo",
-  vision_confianza: 0.985,
+  mqttConnected: false,
+  temperatura: null,
+  humedad: null,
+  foco: null,
+  ventilador: null,
+  rotacion: null,
+  espacios_libres: null,
+  vision_clase: null,
+  vision_confianza: null,
   bloqueado: false,
-  
-  // ML
-  ml_anomalia: false,
-  ml_score: -0.0125,
-  
-  // Energia
-  watts: 68.5,
-  kwh: 0.1420,
-  limite_watts: 80.0,
+  ml_anomalia: null,
+  ml_score: null,
+  watts: null,
+  kwh: null,
+  limite_watts: 80,
   alerta_consumo: false,
-  temporizador_activo: false,
+  temporizador_activo: null,
   segundos_restantes: 0
 };
+
+const chartHistory = { temperatura: [], humedad: [], potencia: [] };
+const MAX_CHART_SAMPLES = 72;
+let selectedChart = "temperatura";
+
+function readNumber(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null || value === "") continue;
+    const number = Number(value);
+    if (Number.isFinite(number)) return number;
+  }
+  return null;
+}
+
+function addChartSample(metric, value) {
+  if (!Number.isFinite(value)) return;
+  const samples = chartHistory[metric];
+  samples.push({ time: Date.now(), value });
+  if (samples.length > MAX_CHART_SAMPLES) samples.shift();
+}
+
+function formatReading(value, decimals, unit = "") {
+  return Number.isFinite(value) ? `${value.toFixed(decimals)}${unit}` : "—";
+}
 
 // =========================================================================
 // 2. CONEXION MQTT SOBRE WEBSOCKETS (Puerto 9001)
@@ -538,6 +629,7 @@ function conectarMQTT() {
 
 function onConnectSuccess() {
   console.log("[MQTT WS] Conectado exitosamente.");
+  appState.mqttConnected = true;
   actualizarEstadoConexion("MQTT En Línea (" + brokerHost + ")", true);
   
   // Suscribirse a todos los topicos de telemetria y control de Fase 3
@@ -553,15 +645,19 @@ function onConnectSuccess() {
     `smartegg/${appState.nodoId}/alarmas/critica`
   ];
   topicos.forEach(t => mqttClient.subscribe(t));
+  actualizarDOM();
 }
 
 function onConnectFailure(err) {
   console.warn("[MQTT WS] Fallo de conexion:", err);
+  appState.mqttConnected = false;
   actualizarEstadoConexion("MQTT Error (clic p/ configurar)", false);
   setTimeout(conectarMQTT, 5000);
 }
 
 function onConnectionLost(responseObject) {
+  appState.mqttConnected = false;
+  actualizarDOM();
   if (responseObject.errorCode !== 0) {
     console.warn("[MQTT WS] Conexion perdida:", responseObject.errorMessage);
     actualizarEstadoConexion("MQTT Reconectando...", false);
@@ -575,27 +671,33 @@ function onMessageArrived(message) {
     const payload = JSON.parse(message.payloadString);
 
     if (topic.includes("temperatura")) {
-      appState.temperatura = parseFloat(payload.valor);
+      appState.temperatura = readNumber(payload.valor, payload.temperatura);
+      addChartSample("temperatura", appState.temperatura);
     } else if (topic.includes("humedad")) {
-      appState.humedad = parseFloat(payload.valor);
+      appState.humedad = readNumber(payload.valor, payload.humedad);
+      addChartSample("humedad", appState.humedad);
     } else if (topic.includes("actuadores/estado")) {
-      appState.foco = String(payload.foco || "OFF").toUpperCase();
-      appState.ventilador = String(payload.ventilador || payload.fan || "OFF").toUpperCase();
-      appState.rotacion = parseFloat(payload.rotacion_grados || 0);
-      appState.espacios_libres = parseInt(payload.espacios_libres !== undefined ? payload.espacios_libres : 1);
+      if (payload.foco !== undefined) appState.foco = String(payload.foco).toUpperCase();
+      const fan = payload.ventilador ?? payload.fan;
+      if (fan !== undefined) appState.ventilador = String(fan).toUpperCase();
+      appState.rotacion = readNumber(payload.rotacion_grados, payload.rotacion) ?? appState.rotacion;
+      appState.espacios_libres = readNumber(payload.espacios_libres) ?? appState.espacios_libres;
     } else if (topic.includes("vision/estado")) {
-      appState.vision_clase = payload.clase || "huevo";
-      appState.vision_confianza = parseFloat(payload.confianza || 0.95);
-      appState.bloqueado = Boolean(payload.bloqueado);
+      appState.vision_clase = payload.clase ? String(payload.clase).toLowerCase() : null;
+      appState.vision_confianza = readNumber(payload.confianza);
+      if (appState.vision_confianza !== null && appState.vision_confianza > 1) appState.vision_confianza /= 100;
+      if (payload.bloqueado !== undefined) appState.bloqueado = Boolean(payload.bloqueado);
     } else if (topic.includes("control/bloqueo")) {
-      appState.bloqueado = Boolean(payload.bloquear !== undefined ? payload.bloquear : payload.bloqueado);
+      const locked = payload.bloquear ?? payload.bloqueado;
+      if (locked !== undefined) appState.bloqueado = Boolean(locked);
     } else if (topic.includes("ml/anomalia")) {
       appState.ml_anomalia = Boolean(payload.anomalia);
-      appState.ml_score = parseFloat(payload.score || 0);
+      appState.ml_score = readNumber(payload.score);
     } else if (topic.includes("energia/consumo")) {
-      appState.watts = parseFloat(payload.watts || payload.potencia || 0);
-      appState.kwh = parseFloat(payload.kwh || payload.consumo_kwh || 0);
-      appState.limite_watts = parseFloat(payload.limite_watts || 80);
+      appState.watts = readNumber(payload.watts, payload.potencia) ?? appState.watts;
+      appState.kwh = readNumber(payload.kwh, payload.consumo_kwh) ?? appState.kwh;
+      appState.limite_watts = readNumber(payload.limite_watts) ?? appState.limite_watts;
+      addChartSample("potencia", appState.watts);
       appState.alerta_consumo = Boolean(payload.alerta_consumo);
       if (payload.temporizador_activo !== undefined) {
         appState.temporizador_activo = Boolean(payload.temporizador_activo);
@@ -610,6 +712,7 @@ function onMessageArrived(message) {
 }
 
 function actualizarEstadoConexion(texto, conectado) {
+  appState.mqttConnected = conectado;
   document.getElementById('statusText').textContent = texto;
   const dot = document.getElementById('statusDot');
   if (conectado) {
@@ -620,15 +723,14 @@ function actualizarEstadoConexion(texto, conectado) {
 }
 
 function actualizarDOM() {
-  document.getElementById('valTemp').textContent = appState.temperatura.toFixed(1) + "°C";
-  document.getElementById('valHum').textContent = appState.humedad.toFixed(0) + "%";
-  document.getElementById('rotacionLabel').textContent = "Rotación: " + appState.rotacion.toFixed(0) + "°";
+  document.getElementById('valTemp').textContent = formatReading(appState.temperatura, 1, " °C");
+  document.getElementById('valHum').textContent = formatReading(appState.humedad, 0, " %");
 
   // Vision
   const visionClaseElem = document.getElementById('visionClase');
   const visionTag = document.getElementById('visionTag');
-  visionClaseElem.textContent = appState.vision_clase.toUpperCase();
-  visionTag.textContent = (appState.vision_confianza * 100).toFixed(1) + "% CONF";
+  visionClaseElem.textContent = appState.vision_clase ? appState.vision_clase.replace(/_/g, " ").toUpperCase() : "Sin lectura";
+  visionTag.textContent = Number.isFinite(appState.vision_confianza) ? (appState.vision_confianza * 100).toFixed(1) + "%" : "—";
   
   if (appState.vision_clase === "huevo") {
     visionTag.className = "badge-tag tag-ok";
@@ -636,41 +738,65 @@ function actualizarDOM() {
   } else if (appState.vision_clase === "objeto_extrano") {
     visionTag.className = "badge-tag tag-danger";
     document.getElementById('visionDetalle').textContent = "¡ALERTA! Objeto no autorizado detectado.";
-  } else {
+  } else if (appState.vision_clase === "vacio" || appState.vision_clase === "vacío") {
     visionTag.className = "badge-tag tag-warn";
     document.getElementById('visionDetalle').textContent = "Compartimiento vacío o sin incubar.";
+  } else if (!appState.vision_clase) {
+    visionTag.className = "badge-tag tag-warn";
+    document.getElementById('visionDetalle').textContent = "Esperando clasificación por MQTT.";
+  } else {
+    visionTag.className = "badge-tag tag-warn";
+    document.getElementById('visionDetalle').textContent = "Clasificación recibida desde la cámara.";
   }
 
   // ML
   const mlEstado = document.getElementById('mlEstado');
   const mlTag = document.getElementById('mlTag');
-  if (appState.ml_anomalia) {
+  if (appState.ml_anomalia === null) {
+    mlEstado.textContent = "Sin lectura";
+    mlTag.textContent = "MQTT";
+    mlTag.className = "badge-tag tag-warn";
+    document.getElementById('mlDetalle').textContent = "Esperando resultado del modelo.";
+  } else if (appState.ml_anomalia) {
     mlEstado.textContent = "ANOMALÍA DETECTADA";
     mlTag.className = "badge-tag tag-danger";
-    document.getElementById('mlDetalle').textContent = `Score atípico: ${appState.ml_score.toFixed(4)} (desviación térmica)`;
+    document.getElementById('mlDetalle').textContent = Number.isFinite(appState.ml_score) ? `Score atípico: ${appState.ml_score.toFixed(4)} (desviación térmica)` : "El modelo reportó una anomalía.";
   } else {
     mlEstado.textContent = "NORMAL";
     mlTag.className = "badge-tag tag-ok";
-    document.getElementById('mlDetalle').textContent = `Score: ${appState.ml_score.toFixed(4)} (dentro de umbral seguro)`;
+    document.getElementById('mlDetalle').textContent = Number.isFinite(appState.ml_score) ? `Score: ${appState.ml_score.toFixed(4)} (dentro de umbral seguro)` : "Sin puntuación disponible.";
   }
 
   // Energia
-  document.getElementById('valWatts').textContent = appState.watts.toFixed(1) + " W";
-  document.getElementById('valKwh').textContent = appState.kwh.toFixed(4) + " kWh";
+  document.getElementById('valWatts').textContent = formatReading(appState.watts, 1, " W");
+  document.getElementById('valKwh').textContent = formatReading(appState.kwh, 4, " kWh");
   if (appState.alerta_consumo) {
-    document.getElementById('valWatts').style.color = "#f43f5e";
+    document.getElementById('valWatts').style.color = "var(--accent-rose)";
   } else {
-    document.getElementById('valWatts').style.color = "#10b981";
+    document.getElementById('valWatts').style.color = "#55765e";
   }
+
+  const setActuatorState = (id, value) => {
+    const element = document.getElementById(id);
+    const state = value === null ? "Sin datos" : value;
+    element.textContent = state;
+    element.className = `actuator-state ${state === "ON" ? "is-on" : state === "OFF" ? "is-off" : "is-waiting"}`;
+  };
+  setActuatorState("stateFoco", appState.foco);
+  setActuatorState("stateFan", appState.ventilador);
+  document.getElementById("stateRotation").textContent = formatReading(appState.rotacion, 0, "°");
 
   // Temporizador
   if (appState.temporizador_activo && appState.segundos_restantes > 0) {
     const mins = Math.floor(appState.segundos_restantes / 60);
     const secs = appState.segundos_restantes % 60;
     document.getElementById('timerStatus').textContent = `Temporizador activo: ${mins}m ${secs}s restantes`;
-    document.getElementById('timerStatus').style.color = "#38bdf8";
-  } else {
+    document.getElementById('timerStatus').style.color = "var(--accent-cyan)";
+  } else if (appState.temporizador_activo === false) {
     document.getElementById('timerStatus').textContent = "Temporizador: inactivo";
+    document.getElementById('timerStatus').style.color = "var(--text-muted)";
+  } else {
+    document.getElementById('timerStatus').textContent = "Esperando estado MQTT";
     document.getElementById('timerStatus').style.color = "var(--text-muted)";
   }
 
@@ -726,10 +852,12 @@ function guardarConfigYReconectar() {
 }
 
 // =========================================================================
-// 3. RENDERIZADO VISUAL CON p5.js
-// =========================================================================
-let particulas = [];
-const NUM_PARTICULAS = 60;
+// Gráficas interactivas 2D para el dashboard p5.js.
+const chartConfig = {
+  temperatura: { title: "Temperatura", unit: "°C", min: 30, max: 45, decimals: 1, color: [174, 132, 45], target: 37.5, targetLabel: "Objetivo 37.5 °C" },
+  humedad: { title: "Humedad relativa", unit: "%", min: 20, max: 90, decimals: 0, color: [52, 142, 145], target: 57.5, targetLabel: "Rango recomendado 50–65 %" },
+  potencia: { title: "Potencia eléctrica", unit: "W", min: 0, max: 100, decimals: 1, color: [85, 118, 94], target: null, targetLabel: "" }
+};
 
 function setup() {
   const container = document.getElementById('canvas-container');
@@ -737,201 +865,188 @@ function setup() {
   const h = container.clientHeight || 520;
   const canvas = createCanvas(w, h);
   canvas.parent('canvas-container');
-  angleMode(DEGREES);
-
-  for (let i = 0; i < NUM_PARTICULAS; i++) {
-    particulas.push({
-      rad: random(40, 210),
-      ang: random(360),
-      vel: random(0.2, 0.6),
-      tam: random(2.5, 5.0)
-    });
-  }
-
+  canvas.attribute('aria-label', 'Gráfico 2D de telemetría en tiempo real');
+  textFont('Arial');
   conectarMQTT();
 }
 
 function windowResized() {
   const container = document.getElementById('canvas-container');
-  if (container) {
-    resizeCanvas(container.clientWidth, container.clientHeight);
-  }
+  if (container) resizeCanvas(container.clientWidth, Math.max(container.clientHeight, 340));
+}
+
+function seleccionarGrafica(metric) {
+  if (!chartConfig[metric]) return;
+  selectedChart = metric;
+  document.querySelectorAll('.chart-tab').forEach((button) => {
+    const active = button.dataset.chart === metric;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function formatChartValue(value, config) {
+  return `${Number(value).toFixed(config.decimals)} ${config.unit}`;
+}
+
+function formatSampleTime(timestamp) {
+  const date = new Date(timestamp);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
 function draw() {
-  background(11, 15, 25);
+  background(243, 247, 242);
+  const config = chartConfig[selectedChart];
+  const samples = chartHistory[selectedChart];
+  const padLeft = width < 480 ? 61 : 78;
+  const padRight = width < 480 ? 16 : 30;
+  const plotLeft = padLeft;
+  const plotRight = Math.max(plotLeft + 40, width - padRight);
+  const plotTop = 95;
+  const plotBottom = Math.max(plotTop + 50, height - 68);
 
-  const cx = width / 2;
-  const cy = height / 2;
-  const s = min(width, height) / 460;
+  noStroke();
+  fill(44, 56, 47);
+  textAlign(LEFT, BASELINE);
+  textSize(15);
+  text(config.title, plotLeft, 37);
+  fill(119, 128, 117);
+  textSize(11);
+  text(samples.length ? `${samples.length} lecturas recibidas` : 'Sin lecturas guardadas', plotLeft, 58);
 
-  // 1. Chasis exterior de la incubadora
-  rectMode(CENTER);
-  stroke(31, 41, 61);
-  strokeWeight(2.5 * s);
-  fill(18, 24, 38, 220);
-  rect(cx, cy, 390 * s, 390 * s, 24 * s);
+  const latest = samples.length ? samples[samples.length - 1].value : null;
+  textAlign(RIGHT, BASELINE);
+  fill(44, 56, 47);
+  textSize(width < 480 ? 18 : 22);
+  text(Number.isFinite(latest) ? formatChartValue(latest, config) : '—', plotRight, 42);
+  textAlign(LEFT, BASELINE);
 
-  // Cristal / Borde interior
-  stroke(46, 61, 91, 150);
-  strokeWeight(1.2 * s);
+  noStroke();
+  fill(255, 255, 252);
+  rect(plotLeft, plotTop, plotRight - plotLeft, plotBottom - plotTop, 12);
+
+  let maxValue = config.max;
+  if (selectedChart === 'potencia') {
+    const observedMax = samples.reduce((maximum, sample) => Math.max(maximum, sample.value), 0);
+    maxValue = Math.max(100, appState.limite_watts || 0, observedMax * 1.15);
+  }
+  const minValue = config.min;
+  const valueY = (value) => map(constrain(value, minValue, maxValue), minValue, maxValue, plotBottom, plotTop);
+
+  if (selectedChart === 'humedad') {
+    const bandTop = valueY(65);
+    const bandBottom = valueY(50);
+    noStroke();
+    fill(223, 238, 231, 150);
+    rect(plotLeft, bandTop, plotRight - plotLeft, bandBottom - bandTop);
+  }
+
+  stroke(228, 233, 226);
+  strokeWeight(1);
+  for (let i = 0; i <= 4; i++) {
+    const y = map(i, 0, 4, plotTop, plotBottom);
+    line(plotLeft, y, plotRight, y);
+    noStroke();
+    fill(121, 130, 121);
+    textAlign(RIGHT, CENTER);
+    textSize(width < 480 ? 9 : 10);
+    const tick = maxValue - ((maxValue - minValue) * i / 4);
+    text(`${tick.toFixed(config.decimals)} ${config.unit}`, plotLeft - 9, y);
+    stroke(228, 233, 226);
+  }
+
+  if (selectedChart === 'potencia' && Number.isFinite(appState.limite_watts)) {
+    const limitY = valueY(appState.limite_watts);
+    drawingContext.save();
+    drawingContext.setLineDash([5, 5]);
+    stroke(186, 82, 69, 180);
+    line(plotLeft, limitY, plotRight, limitY);
+    drawingContext.restore();
+    noStroke();
+    fill(160, 74, 62);
+    textAlign(RIGHT, BOTTOM);
+    textSize(10);
+    text(`Límite ${appState.limite_watts.toFixed(0)} W`, plotRight - 7, limitY - 5);
+  } else if (Number.isFinite(config.target)) {
+    const targetY = valueY(config.target);
+    drawingContext.save();
+    drawingContext.setLineDash([4, 5]);
+    stroke(129, 148, 130, 150);
+    line(plotLeft, targetY, plotRight, targetY);
+    drawingContext.restore();
+    noStroke();
+    fill(101, 122, 105);
+    textAlign(RIGHT, BOTTOM);
+    textSize(10);
+    text(config.targetLabel, plotRight - 7, targetY - 5);
+  }
+
+  if (!samples.length) {
+    const waitingText = appState.mqttConnected ? 'Esperando la primera lectura MQTT' : 'Conecta el broker para recibir telemetría';
+    textSize(13);
+    const waitingWidth = Math.min(plotRight - plotLeft - 16, textWidth(waitingText) + 24);
+    const waitingX = (plotLeft + plotRight - waitingWidth) / 2;
+    const waitingY = plotBottom - 41;
+    noStroke();
+    fill(243, 247, 242);
+    rect(waitingX, waitingY, waitingWidth, 30, 9);
+    fill(75, 91, 78);
+    textAlign(CENTER, CENTER);
+    textSize(13);
+    text(waitingText, (plotLeft + plotRight) / 2, waitingY + 15);
+    textAlign(LEFT, BASELINE);
+    return;
+  }
+
+  const points = samples.map((sample, index) => ({
+    x: samples.length === 1 ? (plotLeft + plotRight) / 2 : map(index, 0, samples.length - 1, plotLeft + 4, plotRight - 4),
+    y: valueY(sample.value),
+    sample
+  }));
+
   noFill();
-  rect(cx, cy, 368 * s, 368 * s, 18 * s);
+  stroke(...config.color);
+  strokeWeight(2.8);
+  beginShape();
+  points.forEach((point) => vertex(point.x, point.y));
+  endShape();
 
-  // 2. Particulas de humedad suspendidas en el aire
-  const factorHumedad = map(appState.humedad, 30, 85, 0.5, 2.2);
-  for (let p of particulas) {
-    p.ang += p.vel * factorHumedad;
-    let px = cx + cos(p.ang) * (p.rad * s);
-    let py = cy + sin(p.ang) * (p.rad * 0.75 * s);
+  const lastPoint = points[points.length - 1];
+  noStroke();
+  fill(...config.color, 40);
+  circle(lastPoint.x, lastPoint.y, 18);
+  fill(...config.color);
+  circle(lastPoint.x, lastPoint.y, 8);
 
+  fill(121, 130, 121);
+  textAlign(LEFT, BASELINE);
+  textSize(10);
+  text(formatSampleTime(samples[0].time), plotLeft, plotBottom + 23);
+  textAlign(RIGHT, BASELINE);
+  text(formatSampleTime(samples[samples.length - 1].time), plotRight, plotBottom + 23);
+  textAlign(CENTER, BASELINE);
+  text('Lecturas MQTT recientes', (plotLeft + plotRight) / 2, plotBottom + 46);
+
+  if (mouseX >= plotLeft && mouseX <= plotRight && mouseY >= plotTop && mouseY <= plotBottom) {
+    const index = samples.length === 1 ? 0 : round(map(mouseX, plotLeft, plotRight, 0, samples.length - 1));
+    const point = points[constrain(index, 0, points.length - 1)];
+    stroke(110, 130, 116, 130);
+    strokeWeight(1);
+    line(point.x, plotTop, point.x, plotBottom);
     noStroke();
-    fill(6, 182, 212, 40);
-    circle(px, py, (p.tam + 4.0) * s);
-    fill(14, 165, 233, 190);
-    circle(px, py, p.tam * s);
+    fill(...config.color);
+    circle(point.x, point.y, 9);
+    const label = formatChartValue(point.sample.value, config);
+    const boxWidth = textWidth(label) + 22;
+    const boxX = constrain(point.x - boxWidth / 2, plotLeft + 4, plotRight - boxWidth - 4);
+    const boxY = Math.max(plotTop + 8, point.y - 38);
+    fill(37, 95, 83);
+    rect(boxX, boxY, boxWidth, 27, 8);
+    fill(255, 253, 243);
+    textAlign(CENTER, CENTER);
+    textSize(11);
+    text(label, boxX + boxWidth / 2, boxY + 14);
   }
-
-  // 3. Foco Calefactor (Arriba)
-  drawBulb(cx, cy - 150 * s, s);
-
-  // 4. Ventilador (Derecha)
-  drawFan(cx + 155 * s, cy, s);
-
-  // 5. Bandeja Giratoria de Huevos (Centro)
-  push();
-  translate(cx, cy);
-  rotate(appState.rotacion);
-
-  // Plato base
-  fill(15, 23, 42);
-  stroke(appState.bloqueado ? color(244, 63, 94) : color(6, 182, 212));
-  strokeWeight(2.8 * s);
-  ellipse(0, 0, 220 * s, 220 * s);
-
-  // Aro interno
-  stroke(30, 41, 59);
-  strokeWeight(1.5 * s);
-  ellipse(0, 0, 190 * s, 190 * s);
-
-  // Eje central
-  fill(30, 41, 59);
-  stroke(71, 85, 105);
-  ellipse(0, 0, 36 * s, 36 * s);
-
-  // Posiciones de los 3 huevos
-  const angulos = [-90, 30, 150];
-  const huevosVisibles = Math.max(0, 3 - appState.espacios_libres);
-
-  for (let i = 0; i < 3; i++) {
-    const rad = 66 * s;
-    const hx = cos(angulos[i]) * rad;
-    const hy = sin(angulos[i]) * rad;
-
-    if (i < huevosVisibles) {
-      push();
-      translate(hx, hy);
-      rotate(-appState.rotacion); // mantener orientacion erguida
-
-      if (appState.vision_clase === "objeto_extrano" && i === 0) {
-        // Dibujar objeto extraño (bloque peligroso)
-        fill(244, 63, 94);
-        stroke(255, 255, 255);
-        strokeWeight(2 * s);
-        rect(0, 0, 38 * s, 38 * s, 6 * s);
-        fill(255);
-        textAlign(CENTER, CENTER);
-        textSize(16 * s);
-        text("⚠️", 0, 0);
-      } else {
-        // Huevo realista
-        const tNorm = map(appState.temperatura, 35, 40, 0, 1);
-        const colHuevo = lerpColor(color(254, 243, 199), color(245, 158, 11), tNorm);
-        fill(colHuevo);
-        stroke(180, 83, 9);
-        strokeWeight(1.8 * s);
-        ellipse(0, 0, 42 * s, 54 * s);
-
-        // Brillo cascaron
-        noStroke();
-        fill(255, 255, 255, 80);
-        ellipse(-6 * s, -10 * s, 10 * s, 15 * s);
-      }
-      pop();
-    } else {
-      // Cavidad libre
-      fill(11, 15, 25);
-      stroke(51, 65, 85);
-      strokeWeight(1.5 * s);
-      ellipse(hx, hy, 44 * s, 44 * s);
-      noStroke();
-      fill(71, 85, 105);
-      textAlign(CENTER, CENTER);
-      textSize(8.5 * s);
-      text("LIBRE", hx, hy);
-    }
-  }
-  pop();
-}
-
-function drawBulb(bx, by, s) {
-  push();
-  translate(bx, by);
-  rectMode(CENTER);
-
-  // Soporte
-  fill(30, 41, 59);
-  stroke(71, 85, 105);
-  strokeWeight(1.5 * s);
-  rect(0, -18 * s, 26 * s, 12 * s, 4 * s);
-
-  if (appState.foco === "ON" && !appState.bloqueado) {
-    // Halos calidos
-    noStroke();
-    for (let h = 3; h >= 1; h--) {
-      fill(245, 158, 11, 18 + h * 8);
-      ellipse(0, 0, (26 + h * 18) * s, (26 + h * 18) * s);
-    }
-    // Foco incandescente
-    fill(255, 190, 54, 240);
-    stroke(255, 216, 106);
-    strokeWeight(1.5 * s);
-    ellipse(0, 0, 26 * s, 26 * s);
-  } else {
-    fill(40, 50, 65);
-    stroke(71, 85, 105);
-    ellipse(0, 0, 22 * s, 22 * s);
-  }
-  pop();
-}
-
-function drawFan(fx, fy, s) {
-  push();
-  translate(fx, fy);
-  rectMode(CENTER);
-
-  // Carcasa
-  fill(18, 24, 38);
-  stroke(appState.ventilador === "ON" ? color(6, 182, 212) : color(51, 65, 85));
-  strokeWeight(1.8 * s);
-  rect(0, 0, 28 * s, 72 * s, 8 * s);
-
-  // Aspas giratorias
-  push();
-  rotate(appState.ventilador === "ON" && !appState.bloqueado ? frameCount * 12 : 0);
-  for (let i = 0; i < 4; i++) {
-    push();
-    rotate(i * 90);
-    fill(appState.ventilador === "ON" ? color(56, 189, 248, 220) : color(51, 65, 85));
-    noStroke();
-    ellipse(0, -12 * s, 7 * s, 20 * s);
-    pop();
-  }
-  fill(15, 23, 42);
-  stroke(148, 163, 184);
-  ellipse(0, 0, 8 * s, 8 * s);
-  pop();
-  pop();
 }
 </script>
 </body>

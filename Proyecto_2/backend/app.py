@@ -11,6 +11,7 @@ from flask import Flask, jsonify, request, send_file  # type: ignore
 from flask_cors import CORS  # type: ignore
 
 import energy_service
+import mqtt_ingestion
 import serial_reader
 from database import execute, get_connection, init_db
 from mqtt_publisher import mqtt_publisher
@@ -38,6 +39,7 @@ def _node_id() -> str:
 def _startup() -> None:
     init_db()
     mqtt_publisher.start()
+    mqtt_ingestion.mqtt_ingestion.start()
     serial_reader.iniciar_hilo_serial()
     try:
         energy_service.iniciar_hilo_energia()
@@ -69,61 +71,6 @@ def health():
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     ), (200 if db_ok else 503)
-
-
-@app.get("/datos")
-def get_datos():
-    dato = serial_reader.get_ultimo_dato()
-    if dato:
-        return jsonify(dato)
-
-    conn = get_connection()
-    try:
-        row = execute(
-            conn,
-            "SELECT * FROM lecturas WHERE nodo_id = ? ORDER BY timestamp DESC LIMIT 1",
-            (_node_id(),),
-        ).fetchone()
-    finally:
-        conn.close()
-
-    if row:
-        return jsonify(_as_dict(row))
-    return jsonify({"mensaje": "Sin datos aún"}), 503
-
-
-@app.post("/datos")
-def post_datos():
-    raw_data = request.get_json(silent=True) or {}
-    if not raw_data:
-        return jsonify({"error": "Payload JSON requerido"}), 400
-
-    try:
-        serial_reader.guardar_lectura(raw_data)
-        return jsonify({"mensaje": "Lectura registrada correctamente"}), 201
-    except Exception as exc:
-        LOGGER.warning("Error guardando lectura via API REST: %s", exc)
-        return jsonify({"error": str(exc)}), 500
-
-
-@app.get("/historial")
-def get_historial():
-    limit = min(max(int(request.args.get("limit", 100)), 1), 1000)
-    conn = get_connection()
-    try:
-        rows = execute(
-            conn,
-            """
-            SELECT * FROM lecturas
-            WHERE nodo_id = ?
-            ORDER BY timestamp DESC
-            LIMIT ?
-            """,
-            (_node_id(), limit),
-        ).fetchall()
-    finally:
-        conn.close()
-    return jsonify([_as_dict(row) for row in rows])
 
 
 @app.post("/huevo")

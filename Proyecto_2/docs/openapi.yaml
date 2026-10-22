@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: SmartEgg API
   version: 1.0.0
-  description: API REST para telemetría, lotes, alarmas, operadores y accesos de puerta.
+  description: API REST para estado del servicio, lotes y operaciones administrativas. La telemetría se distribuye exclusivamente por MQTT.
 servers:
   - url: http://localhost:5000
 paths:
@@ -14,32 +14,6 @@ paths:
           description: Backend, base de datos y conectividad disponibles.
         '503':
           description: Backend en estado degradado.
-  /datos:
-    get:
-      summary: Última lectura del nodo
-      responses:
-        '200':
-          description: Telemetría actual.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Reading'
-        '503':
-          description: Todavía no hay lecturas.
-  /historial:
-    get:
-      summary: Historial de lecturas
-      parameters:
-        - $ref: '#/components/parameters/Limit'
-      responses:
-        '200':
-          description: Lecturas ordenadas de la más reciente a la más antigua.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Reading'
   /huevo:
     post:
       summary: Registrar lote de huevos
@@ -139,43 +113,6 @@ components:
         maximum: 1000
         default: 100
   schemas:
-    Reading:
-      type: object
-      required: [nodo_id, temperatura, humedad, timestamp]
-      properties:
-        id:
-          type: integer
-        nodo_id:
-          type: string
-          example: SE-01
-        lote_id:
-          type: integer
-          nullable: true
-        temperatura:
-          type: number
-          format: float
-          example: 37.5
-        humedad:
-          type: number
-          format: float
-          example: 58
-        espacios_libres:
-          type: integer
-          example: 1
-        foco:
-          type: string
-          example: OFF
-        ventilador:
-          type: string
-          example: ON
-        rotacion_grados:
-          type: number
-          example: 45
-        alarma:
-          type: boolean
-        timestamp:
-          type: string
-          format: date-time
     LotInput:
       type: object
       required: [lote, etiqueta]

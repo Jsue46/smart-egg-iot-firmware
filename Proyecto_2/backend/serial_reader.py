@@ -123,8 +123,8 @@ def _set_latest(data: dict[str, Any]) -> None:
         ultimo_dato.update(data)
 
 
-def guardar_lectura(data: dict[str, Any]) -> None:
-    """Persist a reading, close/open alarm intervals, then publish telemetry."""
+def guardar_lectura(data: dict[str, Any], *, publicar_lectura_mqtt: bool = True) -> None:
+    """Persist a reading and alarm intervals, optionally publish live telemetry."""
 
     data = normalizar_dato(data)
     alarma_activa = bool(data["alarma"])
@@ -249,7 +249,8 @@ def guardar_lectura(data: dict[str, Any]) -> None:
         conn.close()
 
     _set_latest(data)
-    mqtt_publisher.publish_reading(data)
+    if publicar_lectura_mqtt:
+        mqtt_publisher.publish_reading(data)
     if alarm_publication:
         mqtt_publisher.publish_alarm(**alarm_publication)
 

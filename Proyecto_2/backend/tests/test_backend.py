@@ -6,7 +6,7 @@ import json
 import numpy as np
 import joblib
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 # Set env before importing
 os.environ["DATABASE_URL"] = ""  # Force SQLite in-memory/local for test
@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 import database
 import energy_service
+import mqtt_ingestion
 import serial_bridge
 
 
@@ -90,6 +91,33 @@ class TestSmartEggBackend(unittest.TestCase):
             [call.args[0] for call in serial_conn.write.call_args_list],
             [b"CMD:APAGAR_ACTUADORES\n", b"CMD:REANUDAR_ACTUADORES\n"],
         )
+
+    def test_mqtt_reading_subscription_passes_full_sample_to_persistence(self):
+        received = []
+        subscriber = mqtt_ingestion.MqttIngestion(received.append)
+        sample = {
+            "nodo_id": "SE-TEST",
+            "temperatura": 37.5,
+            "humedad": 58,
+            "foco": "ON",
+            "fan": "OFF",
+            "timestamp": "2026-10-22T12:00:00+00:00",
+        }
+        message = SimpleNamespace(
+            topic=subscriber.topic,
+            payload=json.dumps(sample).encode("utf-8"),
+        )
+
+        subscriber._on_message(None, None, message)
+
+        self.assertEqual(received, [sample])
+
+    def test_mqtt_ingestion_does_not_republish_bridge_sample(self):
+        sample = {"nodo_id": "SE-TEST", "temperatura": 37.5, "humedad": 58}
+        with patch.object(mqtt_ingestion, "guardar_lectura") as save_reading:
+            mqtt_ingestion._persist_reading(sample)
+
+        save_reading.assert_called_once_with(sample, publicar_lectura_mqtt=False)
 
     def test_database_sqlite_init(self):
         """Test SQLite schema initialization and execute helper."""

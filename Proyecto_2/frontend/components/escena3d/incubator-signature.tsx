@@ -4,7 +4,6 @@ import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { CloseIcon, ExpandIcon, RotationIcon } from "@/components/icons/egg-icons";
-import { IncubatorCanvas } from "@/components/escena3d/incubator-canvas";
 
 const Scene = dynamic(() => import("./incubator-scene"), { ssr: false });
 const HOME_SCENE_ZOOM = 1.14;
@@ -14,7 +13,6 @@ interface IncubatorSignatureProps {
   temperature: number;
   humidity: number;
   occupied: number;
-  capacity: number;
   isAlarm: boolean;
   isVisionLocked: boolean;
   isOnline: boolean;
@@ -39,12 +37,11 @@ function FallbackIllustration({ angle, occupied, humidity, heaterOn, fanOn, door
   );
 }
 
-export function IncubatorSignature({ angle, temperature, humidity, occupied, capacity, isAlarm, isVisionLocked, isOnline, heaterOn, fanOn, doorOpen }: IncubatorSignatureProps) {
+export function IncubatorSignature({ angle, temperature, humidity, occupied, isAlarm, isVisionLocked, isOnline, heaterOn, fanOn, doorOpen }: IncubatorSignatureProps) {
   const reduceMotion = useReducedMotion();
   const [compact, setCompact] = useState(true);
   const [sceneYaw, setSceneYaw] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [viewMode, setViewMode] = useState<"3d" | "canvas">("3d");
   const dragStart = useRef<{ x: number; yaw: number } | null>(null);
 
   useEffect(() => {
@@ -94,7 +91,7 @@ export function IncubatorSignature({ angle, temperature, humidity, occupied, cap
   }, []);
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (compact || reduceMotion || viewMode !== "3d") return;
+    if (compact || reduceMotion) return;
     const target = event.target as HTMLElement;
     if (target.closest("button")) return;
     dragStart.current = { x: event.clientX, yaw: sceneYaw };
@@ -116,21 +113,15 @@ export function IncubatorSignature({ angle, temperature, humidity, occupied, cap
           <p className="incubator-panel-kicker">Incubadora principal · SE-01</p>
           <h2 id="digital-twin-title">Gemelo digital</h2>
         </div>
-        <div className="scene-mode-switch" role="group" aria-label="Vista del gemelo digital">
-          <button type="button" aria-pressed={viewMode === "3d"} className={viewMode === "3d" ? "active" : ""} onClick={() => setViewMode("3d")}>Modelo 3D</button>
-          <button type="button" aria-pressed={viewMode === "canvas"} className={viewMode === "canvas" ? "active" : ""} onClick={() => setViewMode("canvas")}>Simulación Canvas</button>
-        </div>
       </header>
 
       <div
         className={`scene-wrap ${isExpanded ? "is-expanded" : ""}`}
         onPointerDown={handlePointerDown}
-        aria-label={viewMode === "3d" ? "Modelo 3D sincronizado con la telemetría MQTT" : "Simulación Canvas sincronizada con la telemetría MQTT"}
-        title={viewMode === "3d" && !compact && !reduceMotion ? "Arrastra para girar el modelo" : undefined}
+        aria-label="Modelo 3D sincronizado con la telemetría MQTT"
+        title={!compact && !reduceMotion ? "Arrastra para girar el modelo" : undefined}
       >
-        {viewMode === "canvas" ? (
-          <IncubatorCanvas angle={angle} occupied={occupied} capacity={capacity} heaterOn={heaterOn} fanOn={fanOn} alarm={isAlarm} isOnline={isOnline} reduceMotion={Boolean(reduceMotion)} />
-        ) : reduceMotion ? (
+        {reduceMotion ? (
           <FallbackIllustration angle={angle} occupied={occupied} humidity={humidity} heaterOn={heaterOn} fanOn={fanOn} doorOpen={doorOpen} yaw={0} zoom={1} motionEnabled={!reduceMotion} isOnline={isOnline} />
         ) : (
           <Scene key={isExpanded ? "expanded-scene" : "panel-scene"} angle={angle} temperature={temperature} humidity={humidity} occupied={occupied} heaterOn={heaterOn} fanOn={fanOn} doorOpen={doorOpen} yaw={sceneYaw} zoom={HOME_SCENE_ZOOM} alarm={isAlarm} animate isOnline={isOnline} compact={compact} />

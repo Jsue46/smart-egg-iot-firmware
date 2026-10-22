@@ -139,7 +139,9 @@ El **bloqueo automático de bioseguridad mediante visión computacional** consti
 
 ### 2. Uso del Dashboard Interactivo en p5.js
 * Acceso: Hospedado en Azure Blob Storage (o `frontend/public/visualizacion_p5.html`).
-* **Cabina Virtual:** Modelo 2D/3D donde el plato gira en el ángulo exacto del servo físico, el foco emite halos dorados al encender y el ventilador rota según los datos MQTT.
+* Desde el encabezado de **Panel**, el botón **Abrir dashboard p5.js** abre esta interfaz en una pestaña nueva.
+* **Gráficas 2D:** Cambia entre las tendencias MQTT de temperatura, humedad y potencia; al pasar sobre una lectura se muestra su valor.
+* **Estado del sistema:** Las tarjetas muestran visión, ML, actuadores y energía. Los campos permanecen vacíos hasta recibir datos MQTT.
 * **Control de Potencia:** Slider interactivo para ajustar el límite de corte de energía (50W - 150W).
 * **Temporizador:** Botón para fijar ciclos de conexión eléctrica programada.
 * **Reacción de Bloqueo:** Si ocurre un bloqueo, la interfaz despliega una pantalla de alarma roja con el motivo del incidente y un botón seguro de **Desbloqueo**.

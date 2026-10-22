@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
-import { AlarmIcon } from "@/components/icons/egg-icons";
+import { AlarmIcon, DashboardIcon } from "@/components/icons/egg-icons";
 import { IncubatorSignature } from "@/components/escena3d/incubator-signature";
 import { EnergyControlCard } from "@/components/dashboard/energy-control-card";
 import { TelemetryMetricCard } from "@/components/dashboard/telemetry-metric-card";
 import { VisionStatusCard } from "@/components/dashboard/vision-status-card";
 import { useToast } from "@/components/ui/toast-provider";
 import { useTelemetry } from "@/hooks/use-telemetry";
+
+const p5DashboardUrl = process.env.NEXT_PUBLIC_P5_DASHBOARD_URL?.trim() || "/visualizacion_p5.html";
 
 export function DashboardContent() {
   const telemetry = useTelemetry();
@@ -35,10 +37,16 @@ export function DashboardContent() {
           <h2>Estado de incubación</h2>
           <p>Condiciones, visión y consumo · SE-01</p>
         </div>
-        <div className={`dashboard-mqtt-status ${telemetry.isMqttConnected ? "connected" : "disconnected"}`} role="status" aria-live="polite">
-          <span className="dashboard-mqtt-mark"><i /></span>
-          <span><strong>{telemetry.isMqttConnected ? "MQTT conectado" : "MQTT desconectado"}</strong><small>Broker · WebSockets · 9001</small></span>
-          <span className="dashboard-node-pill">SE-01</span>
+        <div className="dashboard-heading-actions">
+          <a className="p5-dashboard-link" href={p5DashboardUrl} target="_blank" rel="noopener noreferrer" aria-label="Abrir el dashboard interactivo p5.js en una pestaña nueva">
+            <DashboardIcon size={25} />
+            <span>Abrir dashboard p5.js</span>
+          </a>
+          <div className={`dashboard-mqtt-status ${telemetry.isMqttConnected ? "connected" : "disconnected"}`} role="status" aria-live="polite">
+            <span className="dashboard-mqtt-mark"><i /></span>
+            <span><strong>{telemetry.isMqttConnected ? "MQTT conectado" : "MQTT desconectado"}</strong><small>Broker · WebSockets · 9001</small></span>
+            <span className="dashboard-node-pill">SE-01</span>
+          </div>
         </div>
       </header>
 
@@ -58,7 +66,6 @@ export function DashboardContent() {
           temperature={telemetry.temperature}
           humidity={telemetry.humidity}
           occupied={telemetry.occupied}
-          capacity={telemetry.capacity}
           isAlarm={telemetry.isAlarm}
           isVisionLocked={telemetry.isVisionLocked}
           isOnline={telemetry.isOnline}
