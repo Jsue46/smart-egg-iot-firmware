@@ -57,6 +57,8 @@ La **Fase 3 de SmartEgg** consolida la evolución de una incubadora IoT tradicio
 > **Documentación Detallada del Sistema:**
 > * [Manual Técnico Completo](docs/ManualTecnico.md) — Arquitectura, modelo E-R, tópicos MQTT, OpenAPI y Valor Disruptivo.
 > * [Manual de Usuario Completo](docs/ManualUsuario.md) — Uso de Grafana, Dashboard p5.js, consola web y resolución de incidentes.
+> * [Guion y Diapositivas del Pitch de 5 Minutos](docs/Pitch_Presentacion_5min.md) — Venta a fondo de innovación, checklist de demo y Q&A técnico.
+> * [Bitácora de Desarrollo de Fase 3](docs/BitacoraDesarrollo.md) — Sprints, matriz de responsabilidades e hitos de integración.
 > * [Especificación OpenAPI 3.0 (docs/openapi.yaml)](docs/openapi.yaml) — Contratos REST del backend.
 > * [Scripts SQL de Auditoría y Calificación (infra/sql/grafana_queries_fase3.sql)](infra/sql/grafana_queries_fase3.sql)
 

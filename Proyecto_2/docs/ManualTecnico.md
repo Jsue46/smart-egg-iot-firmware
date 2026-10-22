@@ -104,6 +104,7 @@ A continuación se detalla la tabla de todos los tópicos del sistema, divididos
 | **`smartegg/SE-01/status`** *(Heredado)* | 1 | Sí | `JSON {nodo_id: string, estado: string, valor: int, timestamp: string}` | Backend / LWT Mosquitto | Grafana, Frontend, p5.js | `{"nodo_id":"SE-01","estado":"online","valor":1,"timestamp":"2026-10-22T10:00:00Z"}` *(offline en LWT)* |
 | **`smartegg/SE-01/sensores/temperatura`** *(Heredado)* | 0 | No | `JSON {nodo_id: string, valor: float, unidad: string, timestamp: string}` | Túnel Serial / Backend | Grafana, Frontend, ML | `{"nodo_id":"SE-01","valor":37.5,"unidad":"°C","timestamp":"2026-10-22T10:00:00Z"}` |
 | **`smartegg/SE-01/sensores/humedad`** *(Heredado)* | 0 | No | `JSON {nodo_id: string, valor: float, unidad: string, timestamp: string}` | Túnel Serial / Backend | Grafana, Frontend, ML | `{"nodo_id":"SE-01","valor":58.0,"unidad":"%","timestamp":"2026-10-22T10:00:00Z"}` |
+| **`smartegg/SE-01/sensores/lectura`** *(Persistencia)* | 1 | No | `JSON {nodo_id: string, temperatura: float, humedad: float, foco: string, ...}` | Túnel Serial (`serial_bridge.py`) | Ingestor BD (`mqtt_ingestion.py`) | `{"nodo_id":"SE-01","temperatura":37.5,"humedad":58.0,"foco":"ON","fan":"OFF",...}` |
 | **`smartegg/SE-01/actuadores/estado`** *(Heredado)* | 1 | Sí | `JSON {nodo_id: string, foco: string, ventilador: string, rotacion_grados: float, espacios_libres: int}` | Túnel Serial / Backend | Grafana, Frontend, ML, Gestor Energía | `{"nodo_id":"SE-01","foco":"ON","ventilador":"OFF","rotacion_grados":45.0,"espacios_libres":0}` |
 | **`smartegg/SE-01/alarmas/critica`** *(Heredado)* | 1 | Sí | `JSON {id: string, tipo: string, severidad: string, mensaje: string, activa: boolean}` | Backend / OpenCV | Grafana, Frontend, p5.js | `{"id":"ALM-01","tipo":"BLOQUEO_SEGURIDAD_VISION","severidad":"CRITICA","mensaje":"Objeto no autorizado detectado","activa":true}` |
 | **`smartegg/SE-01/puerta/evento`** *(Heredado)* | 1 | No | `JSON {id: int, accion: string, operador_id: int, cantidad_huevos: int, timestamp: string}` | Túnel Serial (RFID RC522) | Grafana, Frontend | `{"id":1,"accion":"ABRIR","operador_id":1,"cantidad_huevos":0,"timestamp":"2026-10-22T10:00:00Z"}` |
@@ -212,7 +213,7 @@ Para garantizar que Grafana opere sin interrupciones aun si los módulos de hard
 
 ### 4.2 Endpoints REST Exclusivos de Consulta y Reporte (OpenAPI 3.0)
 
-El contrato formal OpenAPI 3.0 se localiza en [`docs/openapi.yaml`](openapi.yaml). Los endpoints REST expuestos en el puerto 3001 son **exclusivamente de lectura analítica y descarga de documentos**, respetando al 100% la prohibición de control:
+El contrato formal OpenAPI 3.0 se localiza en [`docs/openapi.yaml`](openapi.yaml). Los endpoints REST del backend expuestos en el puerto 5000 (consumidos por el portal web en el puerto 3001) son **exclusivamente de lectura analítica y descarga de documentos**, respetando al 100% la prohibición de control:
 
 | Método | Endpoint | Tipo de Operación | Descripción |
 |---|---|:---:|---|
