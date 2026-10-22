@@ -4,7 +4,7 @@ import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { AuthProvider } from "@/components/auth/auth-provider";
-import { TelemetryProvider } from "@/hooks/use-simulated-telemetry";
+import { TelemetryProvider } from "@/hooks/use-telemetry";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-ui", weight: ["400", "500"] });
 const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-display", weight: ["400", "500"] });

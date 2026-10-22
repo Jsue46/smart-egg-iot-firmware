@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion } from "motion/react";
 import { CapacityIcon, LotIcon, PlusEggIcon, TemperatureIcon } from "@/components/icons/egg-icons";
-import { useSimulatedTelemetry } from "@/hooks/use-simulated-telemetry";
+import { useTelemetry } from "@/hooks/use-telemetry";
 import type { LotStatus } from "@/lib/types";
 
 const statusLabel: Record<LotStatus, string> = {
@@ -15,7 +15,7 @@ const statusLabel: Record<LotStatus, string> = {
 const formatDate = (date: string) => new Intl.DateTimeFormat("es-GT", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
 
 export function LotesContent() {
-  const { lots, occupied, capacity } = useSimulatedTelemetry();
+  const { lots, occupied, capacity } = useTelemetry();
   return (
     <div className="lotes-stack">
       <div className="page-intro-row lots-intro">

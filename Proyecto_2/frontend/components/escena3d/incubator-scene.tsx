@@ -65,7 +65,7 @@ function DiscSlot({ position, occupied, animate }: { position: [number, number];
     <group position={[x, 0.17, z]}>
       <mesh rotation={[Math.PI / 2, 0, 0]} receiveShadow>
         <torusGeometry args={[0.38, 0.055, 18, 48]} />
-        <meshStandardMaterial color="#77d8f5" roughness={0.34} metalness={0.04} emissive="#0b91c7" emissiveIntensity={0.1} />
+        <meshStandardMaterial color="#9aae86" roughness={0.34} metalness={0.04} emissive="#54764a" emissiveIntensity={0.1} />
       </mesh>
       {occupied && <Egg position={[0, 0.31, 0]} animate={animate} />}
     </group>
@@ -98,11 +98,11 @@ function RotatingDisc({ angle, occupied, animate }: { angle: number; occupied: n
     <group ref={disc} position={[0, -0.42, 0.06]}>
       <mesh position={[0, -0.1, 0]} receiveShadow>
         <cylinderGeometry args={[1.43, 1.43, 0.075, 64]} />
-        <meshStandardMaterial color="#111f31" roughness={0.44} metalness={0.3} />
+        <meshStandardMaterial color="#1b3e34" roughness={0.44} metalness={0.3} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
         <extrudeGeometry args={[shape, extrusion]} />
-        <meshPhysicalMaterial color="#0788c5" roughness={0.27} metalness={0.08} clearcoat={0.78} clearcoatRoughness={0.16} emissive="#056b9b" emissiveIntensity={0.12} />
+        <meshPhysicalMaterial color="#6cb7d3" roughness={0.38} metalness={0.035} clearcoat={0.5} clearcoatRoughness={0.2} emissive="#286c83" emissiveIntensity={0.055} />
       </mesh>
       {DISC_SLOTS.map((position, index) => <DiscSlot key={`${position[0]}-${position[1]}`} position={position} occupied={index < occupied} animate={animate} />)}
       <mesh position={[0, 0.2, 0]} castShadow>
@@ -111,7 +111,7 @@ function RotatingDisc({ angle, occupied, animate }: { angle: number; occupied: n
       </mesh>
       <mesh position={[0, 0.315, 0.01]}>
         <boxGeometry args={[0.085, 0.035, 0.26]} />
-        <meshStandardMaterial color="#25222e" roughness={0.38} metalness={0.4} />
+        <meshStandardMaterial color="#34463a" roughness={0.38} metalness={0.4} />
       </mesh>
     </group>
   );
@@ -150,11 +150,11 @@ function IncubatorLid({ open, animate }: { open: boolean; animate: boolean }) {
       </mesh>
       <mesh position={[0, -0.16, 3.38]} castShadow>
         <boxGeometry args={[0.62, 0.13, 0.12]} />
-        <meshStandardMaterial color="#324b54" roughness={0.25} metalness={0.52} emissive={open ? "#39a5a3" : "#101d25"} emissiveIntensity={open ? 0.22 : 0.03} />
+        <meshStandardMaterial color="#3c5a4c" roughness={0.25} metalness={0.52} emissive={open ? "#008f96" : "#173d35"} emissiveIntensity={open ? 0.18 : 0.03} />
       </mesh>
       <mesh position={[0, -0.25, 3.38]}>
         <boxGeometry args={[0.42, 0.045, 0.08]} />
-        <meshStandardMaterial color={open ? "#76e0d1" : "#d2eee7"} roughness={0.28} metalness={0.18} emissive={open ? "#2aa597" : "#6b9b94"} emissiveIntensity={open ? 0.45 : 0.05} />
+        <meshStandardMaterial color={open ? "#80b9a1" : "#d2dfc9"} roughness={0.28} metalness={0.18} emissive={open ? "#368b78" : "#6b8e7b"} emissiveIntensity={open ? 0.32 : 0.05} />
       </mesh>
     </group>
   );
@@ -178,11 +178,11 @@ function HeatingLamp({ enabled, temperature, alarm, animate }: { enabled: boolea
     <group position={[-2.12, 0.82, 0.18]}>
       <mesh position={[0.1, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
         <cylinderGeometry args={[0.15, 0.18, 0.2, 24]} />
-        <meshStandardMaterial color="#303b4b" roughness={0.34} metalness={0.58} />
+        <meshStandardMaterial color="#30483c" roughness={0.34} metalness={0.58} />
       </mesh>
       <mesh position={[0.12, 0, 0]} castShadow>
         <boxGeometry args={[0.28, 0.16, 0.2]} />
-        <meshStandardMaterial color="#384656" roughness={0.3} metalness={0.48} />
+        <meshStandardMaterial color="#3b5547" roughness={0.3} metalness={0.48} />
       </mesh>
       <mesh ref={bulb} position={[0.34, 0, 0]} castShadow>
         <sphereGeometry args={[0.19, 24, 16]} />
@@ -222,37 +222,37 @@ function VentilationFan({ enabled, animate }: { enabled: boolean; animate: boole
   return (
     <group position={[2.12, 0.38, 0.12]} rotation={[0, Math.PI / 2, 0]} scale={0.66}>
       <RoundedBox args={[1.72, 1.72, 0.12]} radius={0.13} smoothness={4} position={[0, 0, -0.06]} castShadow>
-        <meshStandardMaterial color="#151d27" roughness={0.36} metalness={0.62} />
+        <meshStandardMaterial color="#203a31" roughness={0.36} metalness={0.62} />
       </RoundedBox>
       <RoundedBox args={[1.48, 1.48, 0.045]} radius={0.08} smoothness={3} position={[0, 0, 0.02]}>
-        <meshStandardMaterial color="#03070d" roughness={0.68} metalness={0.12} />
+        <meshStandardMaterial color="#13271f" roughness={0.68} metalness={0.12} />
       </RoundedBox>
       <mesh position={[0, 0.8, 0.06]} castShadow>
         <boxGeometry args={[1.55, 0.12, 0.11]} />
-        <meshStandardMaterial color="#222c39" roughness={0.32} metalness={0.56} />
+        <meshStandardMaterial color="#354c40" roughness={0.32} metalness={0.56} />
       </mesh>
       <mesh position={[0, -0.8, 0.06]} castShadow>
         <boxGeometry args={[1.55, 0.12, 0.11]} />
-        <meshStandardMaterial color="#222c39" roughness={0.32} metalness={0.56} />
+        <meshStandardMaterial color="#354c40" roughness={0.32} metalness={0.56} />
       </mesh>
       <mesh position={[-0.8, 0, 0.06]} castShadow>
         <boxGeometry args={[0.12, 1.55, 0.11]} />
-        <meshStandardMaterial color="#222c39" roughness={0.32} metalness={0.56} />
+        <meshStandardMaterial color="#354c40" roughness={0.32} metalness={0.56} />
       </mesh>
       <mesh position={[0.8, 0, 0.06]} castShadow>
         <boxGeometry args={[0.12, 1.55, 0.11]} />
-        <meshStandardMaterial color="#222c39" roughness={0.32} metalness={0.56} />
+        <meshStandardMaterial color="#354c40" roughness={0.32} metalness={0.56} />
       </mesh>
       {mountPoints.map(([x, y]) => {
         return (
           <group key={`${x}-${y}`} position={[x * 0.7, y * 0.7, 0.14]}>
             <mesh rotation={[Math.PI / 2, 0, 0]}>
               <torusGeometry args={[0.085, 0.018, 12, 24]} />
-              <meshStandardMaterial color="#8995a1" roughness={0.28} metalness={0.55} />
+              <meshStandardMaterial color="#a6b29d" roughness={0.28} metalness={0.55} />
             </mesh>
             <mesh rotation={[Math.PI / 2, 0, 0]}>
               <cylinderGeometry args={[0.047, 0.047, 0.025, 16]} />
-              <meshStandardMaterial color="#080d14" roughness={0.45} metalness={0.18} />
+              <meshStandardMaterial color="#1a2d24" roughness={0.45} metalness={0.18} />
             </mesh>
           </group>
         );
@@ -260,24 +260,24 @@ function VentilationFan({ enabled, animate }: { enabled: boolean; animate: boole
       {[-0.78, 0.78].map((barAngle) => (
         <mesh key={barAngle} position={[0, 0, 0.24]} rotation={[0, 0, barAngle]} castShadow>
           <boxGeometry args={[1.62, 0.075, 0.07]} />
-          <meshStandardMaterial color="#202a36" roughness={0.32} metalness={0.5} />
+          <meshStandardMaterial color="#31473b" roughness={0.32} metalness={0.5} />
         </mesh>
       ))}
       <group ref={blades}>
         {Array.from({ length: 7 }, (_, index) => (
           <mesh key={index} position={[0, 0, 0.13]} rotation={[0, 0, (index * Math.PI * 2) / 7 + 0.16]} castShadow>
             <extrudeGeometry args={[bladeShape, bladeExtrusion]} />
-            <meshStandardMaterial color={enabled ? "#f6fbff" : "#8d99a4"} roughness={0.3} metalness={0.12} emissive={enabled ? "#4bc4e6" : "#1a2632"} emissiveIntensity={enabled ? 0.18 : 0.025} />
+            <meshStandardMaterial color={enabled ? "#e6eadc" : "#849080"} roughness={0.3} metalness={0.12} emissive={enabled ? "#789461" : "#294337"} emissiveIntensity={enabled ? 0.14 : 0.025} />
           </mesh>
         ))}
       </group>
       <mesh position={[0, 0, 0.2]} rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[0.3, 0.035, 16, 32]} />
-        <meshStandardMaterial color={enabled ? "#5ed6f5" : "#566474"} roughness={0.28} metalness={0.5} emissive={enabled ? "#167fa4" : "#101b28"} emissiveIntensity={enabled ? 0.2 : 0.03} />
+        <meshStandardMaterial color={enabled ? "#9aae86" : "#718375"} roughness={0.28} metalness={0.5} emissive={enabled ? "#668342" : "#234638"} emissiveIntensity={enabled ? 0.16 : 0.03} />
       </mesh>
       <mesh position={[0, 0, 0.23]} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <cylinderGeometry args={[0.27, 0.27, 0.18, 32]} />
-        <meshStandardMaterial color="#151c25" roughness={0.3} metalness={0.58} />
+        <meshStandardMaterial color="#233b31" roughness={0.3} metalness={0.58} />
       </mesh>
       <mesh position={[0, 0, 0.34]} rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[0.2, 0.2, 0.025, 32]} />
@@ -285,13 +285,13 @@ function VentilationFan({ enabled, animate }: { enabled: boolean; animate: boole
       </mesh>
       <mesh position={[0, -0.035, 0.36]}>
         <boxGeometry args={[0.34, 0.06, 0.012]} />
-        <meshStandardMaterial color="#1ca2d6" roughness={0.34} metalness={0.12} />
+        <meshStandardMaterial color="#efb216" roughness={0.4} metalness={0.12} />
       </mesh>
     </group>
   );
 }
 
-function LcdScreen({ angle, temperature, humidity, heaterOn, fanOn, doorOpen }: { angle: number; temperature: number; humidity: number; heaterOn: boolean; fanOn: boolean; doorOpen: boolean }) {
+function LcdScreen({ angle, temperature, humidity, heaterOn, fanOn, doorOpen, isOnline }: { angle: number; temperature: number; humidity: number; heaterOn: boolean; fanOn: boolean; doorOpen: boolean; isOnline: boolean }) {
   const display = useMemo(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 1024;
@@ -324,8 +324,8 @@ function LcdScreen({ angle, temperature, humidity, heaterOn, fanOn, doorOpen }: 
     context.fillText("SE-01", 850, 37);
     context.fillStyle = "#d1ffcb";
     context.font = "700 43px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-    context.fillText(`${temperature.toFixed(1)}°C`, 24, 106);
-    context.fillText(`${humidity.toFixed(1)}%`, 665, 106);
+    context.fillText(isOnline ? `${temperature.toFixed(1)}°C` : "—", 24, 106);
+    context.fillText(isOnline ? `${humidity.toFixed(1)}%` : "—", 665, 106);
     context.fillStyle = "#83dba9";
     context.font = "700 23px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
     context.fillText(`F:${heaterOn ? "ON" : "OFF"}`, 24, 161);
@@ -333,7 +333,7 @@ function LcdScreen({ angle, temperature, humidity, heaterOn, fanOn, doorOpen }: 
     context.fillText(`P:${doorOpen ? "OPEN" : "CLOSE"}`, 505, 161);
     context.fillText(`R:${Math.round(angle)}°`, 745, 161);
     display.texture.needsUpdate = true;
-  }, [display, angle, temperature, humidity, heaterOn, fanOn, doorOpen]);
+  }, [display, angle, temperature, humidity, heaterOn, fanOn, doorOpen, isOnline]);
 
   useEffect(() => () => display.texture.dispose(), [display]);
 
@@ -345,17 +345,17 @@ function LcdScreen({ angle, temperature, humidity, heaterOn, fanOn, doorOpen }: 
   );
 }
 
-function SideLcd({ angle, temperature, humidity, heaterOn, fanOn, doorOpen }: { angle: number; temperature: number; humidity: number; heaterOn: boolean; fanOn: boolean; doorOpen: boolean }) {
+function SideLcd({ angle, temperature, humidity, heaterOn, fanOn, doorOpen, isOnline }: { angle: number; temperature: number; humidity: number; heaterOn: boolean; fanOn: boolean; doorOpen: boolean; isOnline: boolean }) {
   return (
     <group position={[2.22, -1.08, 0.22]} rotation={[0, Math.PI / 2, 0]} scale={0.9}>
       <RoundedBox args={[1.34, 0.5, 0.12]} radius={0.08} smoothness={4} position={[0, 0, -0.05]} castShadow>
-        <meshStandardMaterial color="#18232b" roughness={0.3} metalness={0.58} />
+        <meshStandardMaterial color="#243c32" roughness={0.3} metalness={0.58} />
       </RoundedBox>
       <mesh position={[0, 0, 0.035]}>
         <boxGeometry args={[1.14, 0.32, 0.035]} />
         <meshStandardMaterial color="#0b332d" roughness={0.42} metalness={0.12} emissive="#103f35" emissiveIntensity={0.32} />
       </mesh>
-      <LcdScreen angle={angle} temperature={temperature} humidity={humidity} heaterOn={heaterOn} fanOn={fanOn} doorOpen={doorOpen} />
+      <LcdScreen angle={angle} temperature={temperature} humidity={humidity} heaterOn={heaterOn} fanOn={fanOn} doorOpen={doorOpen} isOnline={isOnline} />
     </group>
   );
 }
@@ -379,7 +379,7 @@ function LowerWallPanels() {
       </RoundedBox>
       <mesh position={[0, -0.64, 0]}>
         <boxGeometry args={[4.14, 0.035, 3.46]} />
-        <meshStandardMaterial color="#799993" roughness={0.38} metalness={0.3} emissive="#2c645a" emissiveIntensity={0.08} />
+        <meshStandardMaterial color="#839b83" roughness={0.38} metalness={0.3} emissive="#2c645a" emissiveIntensity={0.08} />
       </mesh>
     </group>
   );
@@ -389,20 +389,20 @@ function IncubatorBases() {
   return (
     <group>
       <RoundedBox args={[4.08, 0.24, 3.34]} radius={0.1} smoothness={3} position={[0, -1.5, 0]} castShadow receiveShadow>
-        <meshStandardMaterial color="#292a2a" roughness={0.4} metalness={0.42} />
+        <meshStandardMaterial color="#293b32" roughness={0.4} metalness={0.42} />
       </RoundedBox>
       <RoundedBox args={[3.82, 0.065, 3.08]} radius={0.05} smoothness={2} position={[0, -1.345, 0.01]}>
-        <meshStandardMaterial color="#171d21" roughness={0.52} metalness={0.28} />
+        <meshStandardMaterial color="#22372f" roughness={0.52} metalness={0.28} />
       </RoundedBox>
       <RoundedBox args={[3.56, 0.18, 3.3]} radius={0.08} smoothness={3} position={[0, -0.72, 0]} castShadow receiveShadow>
         <meshStandardMaterial color="#39484a" roughness={0.35} metalness={0.48} />
       </RoundedBox>
       <RoundedBox args={[3.3, 0.075, 3.02]} radius={0.05} smoothness={2} position={[0, -0.61, 0.01]}>
-        <meshStandardMaterial color="#1c3a3d" roughness={0.4} metalness={0.34} emissive="#123f40" emissiveIntensity={0.12} />
+      <meshStandardMaterial color="#1c3a32" roughness={0.4} metalness={0.34} emissive="#17473f" emissiveIntensity={0.12} />
       </RoundedBox>
       <mesh position={[0, -1.03, 0]} castShadow>
         <cylinderGeometry args={[0.31, 0.36, 0.55, 36]} />
-        <meshStandardMaterial color="#26242b" roughness={0.34} metalness={0.5} />
+      <meshStandardMaterial color="#313b33" roughness={0.34} metalness={0.5} />
       </mesh>
       <mesh position={[0, -0.72, 0]} castShadow>
         <cylinderGeometry args={[0.13, 0.13, 0.16, 24]} />
@@ -415,7 +415,7 @@ function IncubatorBases() {
 function AirflowParticles({ fanOn, humidity, animate }: { fanOn: boolean; humidity: number; animate: boolean }) {
   const particles = useRef<THREE.Group>(null);
   const humidityRatio = THREE.MathUtils.clamp((humidity - 35) / 45, 0, 1);
-  const particleColor = humidityRatio > 0.68 ? "#38bdf8" : "#7dd3fc";
+  const particleColor = humidityRatio > 0.68 ? "#c3cf9d" : "#a9c5a3";
 
   useFrame(({ clock }) => {
     if (!particles.current) return;
@@ -466,7 +466,7 @@ function AirflowParticles({ fanOn, humidity, animate }: { fanOn: boolean; humidi
   );
 }
 
-function Model({ angle, temperature, humidity, occupied, heaterOn, fanOn, doorOpen, yaw, alarm, animate }: { angle: number; temperature: number; humidity: number; occupied: number; heaterOn: boolean; fanOn: boolean; doorOpen: boolean; yaw: number; alarm: boolean; animate: boolean }) {
+function Model({ angle, temperature, humidity, occupied, heaterOn, fanOn, doorOpen, yaw, alarm, animate, isOnline }: { angle: number; temperature: number; humidity: number; occupied: number; heaterOn: boolean; fanOn: boolean; doorOpen: boolean; yaw: number; alarm: boolean; animate: boolean; isOnline: boolean }) {
   const glow = Math.min(2.1, Math.max(0.7, 0.8 + (temperature - 36) * 0.65));
 
   return (
@@ -481,7 +481,7 @@ function Model({ angle, temperature, humidity, occupied, heaterOn, fanOn, doorOp
       <IncubatorLid open={doorOpen} animate={animate} />
       <HeatingLamp enabled={heaterOn} temperature={temperature} alarm={alarm} animate={animate} />
       <VentilationFan enabled={fanOn} animate={animate} />
-      <SideLcd angle={angle} temperature={temperature} humidity={humidity} heaterOn={heaterOn} fanOn={fanOn} doorOpen={doorOpen} />
+      <SideLcd angle={angle} temperature={temperature} humidity={humidity} heaterOn={heaterOn} fanOn={fanOn} doorOpen={doorOpen} isOnline={isOnline} />
       <AirflowParticles fanOn={fanOn} humidity={humidity} animate={animate} />
       <RotatingDisc angle={angle} occupied={occupied} animate={animate} />
       <IncubatorBases />
@@ -506,6 +506,8 @@ export interface IncubatorSceneProps {
   zoom: number;
   alarm: boolean;
   animate: boolean;
+  isOnline: boolean;
+  compact: boolean;
 }
 
 function SceneCamera({ zoom }: { zoom: number }) {
@@ -520,13 +522,13 @@ function SceneCamera({ zoom }: { zoom: number }) {
   return null;
 }
 
-export default function IncubatorScene({ angle, temperature, humidity, occupied, heaterOn, fanOn, doorOpen, yaw, zoom, alarm, animate }: IncubatorSceneProps) {
+export default function IncubatorScene({ angle, temperature, humidity, occupied, heaterOn, fanOn, doorOpen, yaw, zoom, alarm, animate, isOnline, compact }: IncubatorSceneProps) {
   return (
-    <Canvas shadows="basic" dpr={[1, 1.35]} camera={{ position: [7.2, 4.6, 8.9], fov: 36 }} gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}>
+    <Canvas shadows={compact ? false : "basic"} dpr={compact ? [1, 1.25] : [1, 1.35]} camera={{ position: [7.2, 4.6, 8.9], fov: 36 }} gl={{ antialias: true, alpha: true, powerPreference: compact ? "low-power" : "high-performance" }}>
       <ambientLight intensity={1.5} />
       <directionalLight position={[3, 6, 4]} intensity={2.1} color="#fff8ea" castShadow />
       <SceneCamera zoom={zoom} />
-      <Model angle={angle} temperature={temperature} humidity={humidity} occupied={occupied} heaterOn={heaterOn} fanOn={fanOn} doorOpen={doorOpen} yaw={yaw} alarm={alarm} animate={animate} />
+      <Model angle={angle} temperature={temperature} humidity={humidity} occupied={occupied} heaterOn={heaterOn} fanOn={fanOn} doorOpen={doorOpen} yaw={yaw} alarm={alarm} animate={animate} isOnline={isOnline} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.62, 0]} receiveShadow>
         <planeGeometry args={[20, 20]} />
         <shadowMaterial opacity={0.1} />

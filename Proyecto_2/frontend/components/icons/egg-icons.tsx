@@ -103,6 +103,25 @@ export function ConnectionIcon({ size = 48, color = "currentColor", ...props }: 
   );
 }
 
+export function VisionEggIcon({ size = 48, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props}>
+      <EggShell />
+      <path d="M15.5 25s3-5.2 8.5-5.2 8.5 5.2 8.5 5.2-3 5.2-8.5 5.2-8.5-5.2-8.5-5.2Z" />
+      <circle cx="24" cy="25" r="2.5" />
+    </svg>
+  );
+}
+
+export function EnergyEggIcon({ size = 48, color = "currentColor", ...props }: EggIconProps) {
+  return (
+    <svg {...common(size, color)} {...props}>
+      <EggShell />
+      <path d="m26.5 15.8-8 11h6l-2 7.4 9-12h-6l1-6.4Z" />
+    </svg>
+  );
+}
+
 export function ReportIcon({ size = 48, color = "currentColor", ...props }: EggIconProps) {
   return (
     <svg {...common(size, color)} {...props}>
