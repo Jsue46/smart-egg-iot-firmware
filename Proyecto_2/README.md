@@ -74,6 +74,7 @@ El control y monitoreo opera **exclusivamente mediante MQTT**, eliminando APIs i
 | `smartegg/SE-01/ml/anomalia` | 1 | Sí | `{"nodo_id":"SE-01","anomalia":false,"score":-0.0125,"umbral":-0.0052}` | Inferencia predictiva de Isolation Forest. |
 | `smartegg/SE-01/energia/consumo` | 0 | No | `{"nodo_id":"SE-01","watts":68.5,"kwh":0.142,"limite_watts":80.0}` | Potencia instantánea y acumulación. |
 | `smartegg/SE-01/control/energia` | 1 | No | `{"limite_watts":85.0,"temporizador_minutos":30}` | Configuración dinámica de energía y timer. |
+| `smartegg/SE-01/control/actuadores` | 1 | Sí | `{"accion":"APAGAR","motivo":"temporizador_vencido"}` o `{"accion":"REANUDAR","motivo":"temporizador_programado"}` | Última orden del servicio de energía al puente serial al vencer, reprogramar o cancelar el temporizador. |
 | `smartegg/SE-01/alarmas/critica` | 1 | Sí | `{"id":"...","tipo":"BLOQUEO_SEGURIDAD_VISION","activa":true}` | Notificación de alarma crítica en Grafana. |
 
 ---
@@ -144,7 +145,9 @@ El **bloqueo automático de bioseguridad mediante visión computacional** consti
 
 ### 2. Uso del Dashboard Interactivo en p5.js
 * Acceso: Hospedado en Azure Blob Storage (o `frontend/public/visualizacion_p5.html`).
-* **Cabina Virtual:** Modelo 2D/3D donde el plato gira en el ángulo exacto del servo físico, el foco emite halos dorados al encender y el ventilador rota según los datos MQTT.
+* Desde el encabezado de **Panel**, el botón **Abrir dashboard p5.js** abre esta interfaz en una pestaña nueva.
+* **Gráficas 2D:** Cambia entre las tendencias MQTT de temperatura, humedad y potencia; al pasar sobre una lectura se muestra su valor.
+* **Estado del sistema:** Las tarjetas muestran visión, ML, actuadores y energía. Los campos permanecen vacíos hasta recibir datos MQTT.
 * **Control de Potencia:** Slider interactivo para ajustar el límite de corte de energía (50W - 150W).
 * **Temporizador:** Botón para fijar ciclos de conexión eléctrica programada.
 * **Reacción de Bloqueo:** Si ocurre un bloqueo, la interfaz despliega una pantalla de alarma roja con el motivo del incidente y un botón seguro de **Desbloqueo**.

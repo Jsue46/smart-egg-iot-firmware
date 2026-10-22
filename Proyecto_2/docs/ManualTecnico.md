@@ -114,6 +114,7 @@ A continuación se detalla la tabla de todos los tópicos del sistema, divididos
 | **`smartegg/SE-01/ml/anomalia`** ⭐ *(NUEVO 3)* | 1 | Sí | `JSON {nodo_id: string, anomalia: boolean, valor: int, score: float, umbral: float, temp: float}` | Microservicio ML (`ml_service.py`) | Grafana, p5.js, Backend | `{"nodo_id":"SE-01","anomalia":false,"valor":0,"score":-0.0125,"umbral":-0.0052,"temp":37.5}` |
 | **`smartegg/SE-01/energia/consumo`** ⭐ *(NUEVO 4)* | 0 | No | `JSON {nodo_id: string, watts: float, potencia: float, kwh: float, limite_watts: float, alerta_consumo: boolean}` | Backend / Gestor Energía | Grafana, p5.js | `{"nodo_id":"SE-01","watts":68.5,"potencia":68.5,"kwh":0.142,"limite_watts":80.0,"alerta_consumo":false}` |
 | **`smartegg/SE-01/control/energia`** *(Gestión)* | 1 | No | `JSON {limite_watts: float, temporizador_minutos: int, timestamp: string}` | Dashboard p5.js | Gestor Energía / Backend | `{"limite_watts":85.0,"temporizador_minutos":30,"timestamp":"2026-10-22T10:00:00Z"}` |
+| **`smartegg/SE-01/control/actuadores`** *(Energía)* | 1 | Sí | `JSON {accion: string, motivo: string}` | Gestor Energía (`energy_service.py`) | Arduino (Serial Bridge) | `{"accion":"APAGAR","motivo":"temporizador_vencido"}` |
 
 ---
 

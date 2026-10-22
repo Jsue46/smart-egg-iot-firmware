@@ -31,6 +31,15 @@ export interface TelemetryPoint {
   humidity: number;
 }
 
+export interface DoorEvent {
+  id: string;
+  operador: string | null;
+  operador_id: number | null;
+  accion: "ABRIR" | "CERRAR";
+  cantidad_huevos: number | null;
+  timestamp: string;
+}
+
 export interface TelemetryState {
   temperature: number;
   humidity: number;
@@ -41,10 +50,20 @@ export interface TelemetryState {
   occupied: number;
   capacity: number;
   isOnline: boolean;
+  isMqttConnected: boolean;
   isAlarm: boolean;
-  isPaused: boolean;
   history: TelemetryPoint[];
   lots: Lot[];
   alarms: Alarm[];
+  doorEvents: DoorEvent[];
   technician: Technician;
+  visionClass: string | null;
+  visionConfidence: number | null;
+  isVisionLocked: boolean;
+  powerWatts: number | null;
+  energyKwh: number | null;
+  energyLimitWatts: number;
+  energyAlert: boolean;
+  timerActive: boolean;
+  timerSecondsRemaining: number;
 }

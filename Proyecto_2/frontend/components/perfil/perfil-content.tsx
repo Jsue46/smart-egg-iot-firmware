@@ -1,21 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/auth-provider";
-import { useSimulatedTelemetry } from "@/hooks/use-simulated-telemetry";
+import { useTelemetry } from "@/hooks/use-telemetry";
 import { API_BASE_URL } from "@/lib/config";
 import { ROLE_LABELS, type Role } from "@/lib/auth";
 import { DoorIcon, HumidityIcon, LotIcon, ReportIcon, TemperatureIcon, UserIcon } from "@/components/icons/egg-icons";
 import type { Lot } from "@/lib/types";
-
-interface DoorEvent {
-  id: number;
-  operador: string | null;
-  accion: "ABRIR" | "CERRAR";
-  cantidad_huevos: number | null;
-  timestamp: string;
-}
 
 const OPERATOR_BACKEND_NAME: Record<Role, string | null> = {
   administrador: null,
@@ -45,9 +37,14 @@ const dateFormatter = new Intl.DateTimeFormat("es-GT", { dateStyle: "long", time
 
 export function PerfilContent() {
   const { user } = useAuth();
-  const { temperature, humidity, isOnline, doorOpen, occupied } = useSimulatedTelemetry();
+  const { temperature, humidity, isOnline, doorOpen, occupied, doorEvents } = useTelemetry();
   const [myLots, setMyLots] = useState<Lot[]>([]);
-  const [myDoors, setMyDoors] = useState<DoorEvent[]>([]);
+  const myDoors = useMemo(() => {
+    if (!user) return [];
+    const expected = OPERATOR_BACKEND_NAME[user.role];
+    const operatorId = user.role === "operador1" ? 1 : user.role === "operador2" ? 2 : null;
+    return doorEvents.filter((event) => !expected || event.operador === expected || event.operador_id === operatorId);
+  }, [doorEvents, user]);
 
   const loadActivity = useCallback(() => {
     if (!user) return;
@@ -63,22 +60,13 @@ export function PerfilContent() {
       })
       .catch(() => { if (active) setMyLots([]); });
 
-    fetch(`${API_BASE_URL}/accesos-puerta?limit=30`, { cache: "no-store" })
-      .then((response) => response.ok ? response.json() : [])
-      .then((rows: DoorEvent[]) => {
-        if (!active) return;
-        const relevant = expected ? rows.filter((row) => row.operador === expected) : rows;
-        setMyDoors(relevant);
-      })
-      .catch(() => { if (active) setMyDoors([]); });
-
     return () => {
       active = false;
     };
   }, [user]);
 
   useEffect(() => {
-    loadActivity();
+    return loadActivity();
   }, [loadActivity]);
 
   if (!user) return null;

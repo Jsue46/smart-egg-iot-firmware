@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
+import { useTelemetry } from "@/hooks/use-telemetry";
 import { API_BASE_URL } from "@/lib/config";
 import { AdminIcon, AlarmIcon, DoorIcon, GrafanaIcon, LotIcon, RotateLeftIcon, UserIcon } from "@/components/icons/egg-icons";
 
@@ -9,12 +10,10 @@ interface OperatorRow {
   id: number;
   nombre: string;
   rol: string;
-  lotes: number;
-  accesos: number;
 }
 
 interface AlarmRow {
-  id: number;
+  id: string;
   tipo: string;
   severidad: "info" | "warning" | "critical";
   activa: boolean;
@@ -25,8 +24,9 @@ interface AlarmRow {
 }
 
 interface DoorRow {
-  id: number;
+  id: string;
   operador: string | null;
+  operador_id?: number | null;
   accion: string;
   cantidad_huevos: number | null;
   timestamp: string;
@@ -50,42 +50,42 @@ const ALARMS_PER_PAGE = 5;
 
 export function AdminConsole() {
   const { user } = useAuth();
+  const { alarms: liveAlarms, doorEvents } = useTelemetry();
   const [operators, setOperators] = useState<OperatorRow[]>([]);
   const [lots, setLots] = useState<any[]>([]);
-  const [alarms, setAlarms] = useState<AlarmRow[]>([]);
-  const [doors, setDoors] = useState<DoorRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [alarmPage, setAlarmPage] = useState(1);
+  const alarms = useMemo<AlarmRow[]>(() => liveAlarms.map((alarm) => ({
+    id: alarm.id,
+    tipo: alarm.title,
+    severidad: alarm.severity,
+    activa: alarm.active === true,
+    mensaje: alarm.detail,
+    inicio_at: alarm.timestamp,
+    timestamp: alarm.timestamp,
+  })), [liveAlarms]);
+  const doors = doorEvents as DoorRow[];
+  const operatorRows = useMemo(() => operators.map((operator) => ({
+    ...operator,
+    lotes: lots.filter((lot) => lot.tecnico === operator.nombre).length,
+    accesos: doors.filter((door) => door.operador === operator.nombre || door.operador === `Operador ${door.operador_id}`).length,
+  })), [doors, lots, operators]);
 
   const load = useCallback(async () => {
     setRefreshing(true);
     setAlarmPage(1);
     try {
-      const [opRes, lotRes, alarmRes, doorRes] = await Promise.all([
+      const [opRes, lotRes] = await Promise.all([
         fetch(`${API_BASE_URL}/operadores`, { cache: "no-store" }),
         fetch(`${API_BASE_URL}/huevos`, { cache: "no-store" }),
-        fetch(`${API_BASE_URL}/alarmas?limit=50`, { cache: "no-store" }),
-        fetch(`${API_BASE_URL}/accesos-puerta?limit=30`, { cache: "no-store" }),
       ]);
-      const [opData, lotData, alarmData, doorData] = await Promise.all([
+      const [opData, lotData] = await Promise.all([
         opRes.ok ? opRes.json() : [],
         lotRes.ok ? lotRes.json() : [],
-        alarmRes.ok ? alarmRes.json() : [],
-        doorRes.ok ? doorRes.json() : [],
       ]);
 
       setLots(lotData);
-      setAlarms(alarmData);
-      setDoors(doorData);
-      setOperators(
-        (opData as any[]).map((operator) => ({
-          id: operator.id,
-          nombre: operator.nombre,
-          rol: operator.rol,
-          lotes: (lotData as any[]).filter((lot) => lot.tecnico === operator.nombre).length,
-          accesos: (doorData as any[]).filter((door) => door.operador === operator.nombre).length,
-        })),
-      );
+      setOperators((opData as any[]).map((operator) => ({ id: operator.id, nombre: operator.nombre, rol: operator.rol })));
     } catch {
       // Los datos se muestran parcialmente; el botón de refrescar reintenta.
     } finally {
@@ -148,7 +148,7 @@ export function AdminConsole() {
             {operators.length === 0 ? (
               <p style={{ color: "var(--muted)", fontSize: 12, margin: 0 }}>No hay operadores registrados en el sistema.</p>
             ) : (
-              operators.map((operator) => (
+              operatorRows.map((operator) => (
                 <div key={operator.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: "#fdfcf9", border: "1px solid var(--border)", borderRadius: 13 }}>
                   <AdminIcon size={28} color="var(--forest)" />
                   <div style={{ minWidth: 0 }}>

@@ -4,18 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { downloadSelectableReport } from "@/components/reportes/create-selectable-report";
 import { HistoricoSVG } from "@/components/graficas/historico-svg";
 import { AlarmIcon, DownloadIcon, HumidityIcon, ReportIcon, TemperatureIcon } from "@/components/icons/egg-icons";
-import { API_BASE_URL } from "@/lib/config";
 import { useToast } from "@/components/ui/toast-provider";
-import { useSimulatedTelemetry } from "@/hooks/use-simulated-telemetry";
+import { useTelemetry } from "@/hooks/use-telemetry";
 import type { Alarm } from "@/lib/types";
-
-type DoorEvent = {
-  id: number;
-  accion: string;
-  operador?: string;
-  cantidad_huevos?: number;
-  timestamp: string;
-};
 
 type ReportEvent = {
   id: string;
@@ -50,40 +41,15 @@ const formatTimestamp = (timestamp: string) => {
 const severityLabel = (severity: Alarm["severity"]) => severity === "critical" ? "Crítica" : severity === "warning" ? "Advertencia" : "Informativa";
 
 export function ReportesContent() {
-  const { lots, alarms, temperature, humidity, occupied, capacity, technician } = useSimulatedTelemetry();
+  const { lots, alarms, doorEvents, temperature, humidity, occupied, capacity, technician } = useTelemetry();
   const { showToast } = useToast();
   const [downloading, setDownloading] = useState(false);
-  const [doorEvents, setDoorEvents] = useState<DoorEvent[]>([]);
-  const [eventsLoading, setEventsLoading] = useState(true);
   const [eventKind, setEventKind] = useState<EventKindFilter>("all");
   const [eventSeverity, setEventSeverity] = useState<EventSeverityFilter>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [eventPage, setEventPage] = useState(1);
   const uniqueAlarms = useMemo(() => alarms.filter((alarm, index, all) => index === all.findIndex((candidate) => candidate.id === alarm.id || (candidate.title === alarm.title && candidate.timestamp === alarm.timestamp))), [alarms]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadDoorEvents = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/accesos-puerta?limit=200`, { cache: "no-store" });
-        if (!response.ok) return;
-        const data = await response.json();
-        if (!cancelled) setDoorEvents(Array.isArray(data) ? data : []);
-      } catch {
-        // The alarm history remains available if the optional door history endpoint is offline.
-      } finally {
-        if (!cancelled) setEventsLoading(false);
-      }
-    };
-
-    loadDoorEvents();
-    const interval = window.setInterval(loadDoorEvents, 5000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, []);
 
   const reportEvents = useMemo<ReportEvent[]>(() => {
     const alarmEvents: ReportEvent[] = uniqueAlarms.map((alarm) => ({
@@ -147,7 +113,7 @@ export function ReportesContent() {
       </section>
       <section className="report-card chart-card history-card"><div className="report-card-head"><div><p className="eyebrow">Últimos siete días</p><h2>Historial de temperatura</h2></div><span className="optimal-label"><i /> Banda óptima 36.8–38 °C</span></div><HistoricoSVG /></section>
       <section className="report-card alarms-card" aria-labelledby="events-heading">
-        <div className="report-card-head"><div><p className="eyebrow">Bitácora del sistema</p><h2 id="events-heading">Alarmas y eventos</h2></div><span className="updated-label">{filteredEvents.length} de {reportEvents.length} registros{eventsLoading ? " · sincronizando" : ""}</span></div>
+        <div className="report-card-head"><div><p className="eyebrow">Bitácora del sistema</p><h2 id="events-heading">Alarmas y eventos</h2></div><span className="updated-label">{filteredEvents.length} de {reportEvents.length} eventos MQTT</span></div>
         <div className="event-filters" role="search" aria-label="Filtros de alarmas y eventos">
           <label><span>Desde</span><input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label>
           <label><span>Hasta</span><input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></label>

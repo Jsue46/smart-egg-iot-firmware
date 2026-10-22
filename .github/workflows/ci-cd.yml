@@ -1,0 +1,176 @@
+name: SmartEgg CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install backend and ML dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r Proyecto_2/backend/requirements.txt -r Proyecto_2/ml/requirements.txt
+
+      - name: Check Python syntax
+        run: python -m py_compile Proyecto_2/backend/*.py
+
+      - name: Run backend tests
+        working-directory: Proyecto_2
+        run: python -m unittest discover -s backend/tests -p 'test_*.py' -v
+
+      - name: Validate Docker Compose configuration
+        working-directory: Proyecto_2
+        run: docker compose config --quiet
+
+  build:
+    name: Build frontend
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Proyecto_2/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: Proyecto_2/frontend
+        run: npm ci --ignore-scripts
+
+      - name: Type-check and build Next.js
+        working-directory: Proyecto_2/frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:5000
+          NEXT_PUBLIC_MQTT_WS_URL: ws://localhost:9001
+          NEXT_PUBLIC_NODE_ID: SE-01
+          NEXT_PUBLIC_P5_DASHBOARD_URL: /visualizacion_p5.html
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: |
+          npm run lint
+          npm run build
+
+  deploy:
+    name: Deploy to Azure VM
+    needs: build
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    outputs:
+      vm_host: ${{ steps.configure_ssh.outputs.vm_host }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure SSH and require deployment key
+        id: configure_ssh
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.AZURE_VM_SSH_KEY }}
+          VM_HOST: 23.101.175.40
+        run: |
+          set -euo pipefail
+          if [[ -z "$SSH_PRIVATE_KEY" ]]; then
+            echo "::error::Missing repository secret AZURE_VM_SSH_KEY; production deployment cannot continue."
+            exit 1
+          fi
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keygen -y -f ~/.ssh/id_rsa >/dev/null
+          ssh-keyscan -T 10 -H "$VM_HOST" >> ~/.ssh/known_hosts
+          echo "vm_host=$VM_HOST" >> "$GITHUB_OUTPUT"
+
+      - name: Transfer release and restart Docker services
+        env:
+          VM_HOST: 23.101.175.40
+          VM_USER: azureuser
+        run: |
+          set -euo pipefail
+          tar \
+            --exclude='node_modules' \
+            --exclude='.next' \
+            --exclude='__pycache__' \
+            --exclude='.git' \
+            --exclude='.env' \
+            -czf /tmp/smartegg-release.tar.gz \
+            -C Proyecto_2 .
+
+          scp -i ~/.ssh/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            /tmp/smartegg-release.tar.gz \
+            "$VM_USER@$VM_HOST:/tmp/smartegg-release.tar.gz"
+
+          ssh -i ~/.ssh/id_rsa -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$VM_USER@$VM_HOST" 'bash -s' <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          APP_DIR="/opt/smartegg/repo/Proyecto_2"
+          DEPLOY_OWNER="$(id -un)"
+          DEPLOY_GROUP="$(id -gn)"
+
+          if ! sudo -n true; then
+            echo "::error::The VM user needs passwordless sudo to prepare $APP_DIR."
+            exit 1
+          fi
+
+          sudo -n install -d -m 755 -o "$DEPLOY_OWNER" -g "$DEPLOY_GROUP" "$APP_DIR"
+          sudo -n chown -R "$DEPLOY_OWNER:$DEPLOY_GROUP" "$APP_DIR"
+          tar -xzf /tmp/smartegg-release.tar.gz -C "$APP_DIR"
+          rm -f /tmp/smartegg-release.tar.gz
+          cd "$APP_DIR"
+          docker compose up -d --build --remove-orphans
+          docker compose ps
+          REMOTE_SCRIPT
+
+  health-check:
+    name: Check deployed services
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for frontend and backend health
+        env:
+          VM_HOST: ${{ needs.deploy.outputs.vm_host }}
+        run: |
+          set -euo pipefail
+
+          wait_for_http() {
+            local service="$1"
+            local url="$2"
+            local attempt response
+
+            for attempt in {1..12}; do
+              if response=$(curl --connect-timeout 5 --max-time 10 --silent --show-error \
+                --fail --output /dev/null --write-out '%{http_code}' "$url"); then
+                echo "$service is healthy (HTTP $response)."
+                return 0
+              fi
+              echo "$service is not ready (attempt $attempt/12); retrying in 5 seconds."
+              sleep 5
+            done
+
+            echo "::error::$service did not become healthy at $url."
+            return 1
+          }
+
+          wait_for_http "Frontend" "http://${VM_HOST}:3001/login"
+          wait_for_http "Backend" "http://${VM_HOST}:5000/health"
