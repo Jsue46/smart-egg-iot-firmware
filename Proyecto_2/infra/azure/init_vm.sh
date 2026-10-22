@@ -39,6 +39,8 @@ POSTGRES_PASSWORD=cambiar_esta_clave
 GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=admin
 EOF
+# GitHub Actions connects as azureuser and must be able to replace these files.
+chown -R azureuser:azureuser /opt/smartegg
 
 # Levantar Docker Compose
 docker compose up -d --build

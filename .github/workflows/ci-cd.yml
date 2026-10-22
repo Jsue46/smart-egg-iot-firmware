@@ -125,7 +125,16 @@ jobs:
             "$VM_USER@$VM_HOST" 'bash -s' <<'REMOTE_SCRIPT'
           set -euo pipefail
           APP_DIR="/opt/smartegg/repo/Proyecto_2"
-          mkdir -p "$APP_DIR"
+          DEPLOY_OWNER="$(id -un)"
+          DEPLOY_GROUP="$(id -gn)"
+
+          if ! sudo -n true; then
+            echo "::error::The VM user needs passwordless sudo to prepare $APP_DIR."
+            exit 1
+          fi
+
+          sudo -n install -d -m 755 -o "$DEPLOY_OWNER" -g "$DEPLOY_GROUP" "$APP_DIR"
+          sudo -n chown -R "$DEPLOY_OWNER:$DEPLOY_GROUP" "$APP_DIR"
           tar -xzf /tmp/smartegg-release.tar.gz -C "$APP_DIR"
           rm -f /tmp/smartegg-release.tar.gz
           cd "$APP_DIR"
