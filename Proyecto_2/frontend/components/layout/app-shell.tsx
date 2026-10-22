@@ -31,7 +31,6 @@ interface NavItem {
 
 const navigation: NavItem[] = [
   { href: "/dashboard", label: "Panel", icon: DashboardIcon, roles: ["administrador", "operador1", "operador2"] },
-  { href: "/simulador", label: "Simulador p5.js", icon: RotationIcon, roles: ["administrador", "operador1", "operador2"] },
   { href: "/lotes", label: "Lotes", icon: LotIcon, roles: ["administrador", "operador1", "operador2"] },
   { href: "/reportes", label: "Reportes", icon: ReportIcon, roles: ["administrador", "operador1", "operador2"] },
   { href: "/puerta", label: "Puerta", icon: DoorIcon, roles: ["operador1", "operador2"] },
