@@ -6,9 +6,9 @@ import { ToastProvider } from "@/components/ui/toast-provider";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { TelemetryProvider } from "@/hooks/use-telemetry";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-ui", weight: ["400", "500"] });
-const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-display", weight: ["400", "500"] });
-const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", weight: ["400", "500"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-ui" });
+const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-display" });
+const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
   title: { default: "SmartEgg", template: "%s · SmartEgg" },
