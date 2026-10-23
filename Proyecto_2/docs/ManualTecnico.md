@@ -1,374 +1,417 @@
-# SmartEgg IoT — Documentación Técnica del Proyecto 1
+# SmartEgg IoT — Manual Técnico (Fase 3)
 
-## 1. Descripción de la Solución y Continuidad respecto a la Práctica 1
-
-### 1.1 Contexto y Evolución del Sistema
-En la **Práctica 1**, el sistema *SmartEgg* se concibió como un prototipo funcional monolítico enfocado en la adquisición física y el control básico de una incubadora avícola automatizada. Dicha fase inicial integró la lectura de sensores de temperatura y humedad (DHT11), detección de presencia de huevos mediante finales de carrera, actuación térmica mediante relés (foco calefactor y ventilador extractor), el movimiento oscilatorio mecánico de una bandeja giratoria controlada por servomotor ($\pm45^\circ$) y una aplicación de escritorio/web respaldada por una base de datos local SQLite y una API REST desarrollada en Flask.
-
-Para este **Proyecto 1**, la solución evoluciona desde un sistema aislado hacia una **arquitectura distribuida IoT de grado industrial**, desacoplada, observable y contenerizada. El objetivo principal de esta transición es mitigar la latencia en la propagación de eventos críticos, garantizar la persistencia relacional concurrente de los datos de telemetría y dotar al operador de mecanismos analíticos y visuales interactivos de alto rendimiento.
-
----
-
-### 1.2 Arquitectura y Componentes de Continuidad
-
-El proyecto mantiene la lógica de hardware y de negocio establecida en la práctica inicial, expandiendo sus capacidades a través de los siguientes ejes de continuidad:
-
-* **Capa de Adquisición Física (Microcontrolador & Serial):**
-  Se preserva la integración con el microcontrolador físico mediante UART. En despliegue, el puente serial del host publica la telemetría por MQTT; el lector serial del backend queda disponible para pruebas locales y reintenta la conexión ante desconexiones físicas. El simulador queda desactivado por defecto. También se registra el acceso físico a cabina mediante switch/sensor.
-
-* **Núcleo del Backend (Python & Flask):**
-  Flask expone operaciones administrativas (lotes, operadores, alarmas, eventos de puerta y reportes). La telemetría no se consulta ni se envía por HTTP: el backend recibe por MQTT la lectura completa para persistirla en la base relacional.
-
-* **Transición de Persistencia (SQLite a Base de Datos Relacional Contenerizada):**
-  El esquema inicial de almacenamiento migra hacia un motor relacional formal orquestado en Docker (PostgreSQL/MySQL), integrando un modelo entidad-relación normalizado que soporta el ciclo de vida de lotes, operadores designados (Operador 1, Operador 2, Administrador), bitácora de accesos de puerta y métricas históricas indexadas.
-
-* **Capa de Transporte Híbrida (REST administrativo + MQTT sobre WebSockets):**
-  La telemetría, los estados de actuadores y los eventos en tiempo real se distribuyen mediante MQTT. REST queda para lotes y otras operaciones administrativas. Los mensajes de estado utilizan QoS, retención y Last Will and Testament (LWT) para que la interfaz observe cambios sin sondeo HTTP.
-
-* **Ecosistema de Frontend y Observabilidad (Next.js & Grafana):**
-  La interfaz de usuario pasa a construirse sobre Next.js (React + TypeScript) con una estética editorial botánica adaptada a la identidad del proyecto. En este entorno convergen:
-  1. Paneles analíticos construidos con **Chart.js** para el seguimiento continuo de tendencias térmicas y ocupación histórica.
-  2. Un dashboard web independiente e interactivo en **p5.js**, con gráficas 2D de temperatura, humedad y potencia que consume telemetría MQTT.
-  3. Dashboards avanzados en **Grafana** conectados al broker MQTT y a la base de datos para la supervisión y auditoría de la infraestructura operativa.
-
-## 2. Diagrama de arquitectura general
-### 2.1 Diagrama de Arquitectura
-
-![diagrama arquitectura](<imagenes/Diagrama de arquitectura genera.png>)
+**Universidad de San Carlos de Guatemala**  
+Facultad de Ingeniería — Escuela de Ciencias y Sistemas  
+Arquitectura de Computadores y Ensambladores 2 — Segundo Semestre 2026  
+Catedrático: Ing. Gabriel Alejandro Díaz  
+Auxiliares: Josue Antonio Cux Barrientos, Marcos Geovani Josías Pérez Secay  
+Grupo: **15**
 
 ---
 
-### 2.2 Descripción y Detalle de Conexiones
-
-La arquitectura de **SmartEgg IoT** desacopla la adquisición de señales físicas, la persistencia transaccional, el despacho de telemetría asíncrona y la observabilidad distribuida. Cada enlace cumple una función técnica específica dentro del flujo de datos:
-
-* **1. Componentes, Módulos, Sensores y Actuadores $\longleftrightarrow$ Microcontrolador (Capa Física / GPIO):**
-  * **Protocolo / Interfaz:** Conexiones directas por entradas y salidas analógicas/digitales (GPIO) e interfaces de un solo hilo (One-Wire).
-  * **Descripción:** Los transductores físicos (sensor DHT11 para temperatura y humedad, finales de carrera para conteo de huevos y sensor/switch de acceso de puerta) envían sus señales eléctricas al microcontrolador. En sentido inverso, el microcontrolador conmuta los actuadores de cabina (relés para foco calefactor y ventilador extractor) y envía el tren de pulsos PWM hacia el servomotor MG996R para el ciclo de inclinación de la bandeja a $\pm45^\circ$.
-
-* **2. Microcontrolador $\longrightarrow$ Puente serial $\longrightarrow$ MQTT Broker:**
-  * **Protocolo / Interfaz:** UART sobre USB (9600 baudios) y MQTT sobre TCP (puerto 1883).
-  * **Descripción:** El puente lee las tramas JSON del Arduino, publica las variables en sus tópicos MQTT en vivo y envía el objeto completo a `smartegg/{id}/sensores/lectura` con QoS 1. El suscriptor MQTT del backend valida y persiste esa lectura. Para pruebas locales también se puede habilitar la lectura serial directa del backend.
-
-* **3. Backend REST/API $\longleftrightarrow$ Base de Datos (`Query` / Persistencia):**
-  * **Protocolo / Interfaz:** Conector SQL / TCP sobre red interna de contenedores.
-  * **Descripción:** El suscriptor MQTT ejecuta `INSERT` transaccionales para guardar las lecturas recibidas, alarmas y eventos. Las consultas SQL se usan en operaciones administrativas y para construir reportes; la interfaz no recupera telemetría mediante endpoints REST.
-
-* **4. Backend REST/API $\longleftrightarrow$ Frontend Web (`Request` / HTTP REST):**
-  * **Protocolo / Interfaz:** HTTP/1.1 (JSON) sobre TCP/IP con soporte CORS.
-  * **Descripción:** Comunicación cliente-servidor para acciones administrativas bajo demanda, como lotes y reportes. La interfaz recibe temperatura, humedad, actuadores, alarmas y eventos en vivo directamente por MQTT sobre WebSockets.
-
-* **5. Puente serial/backend $\longrightarrow$ MQTT Broker (`Publisher`):**
-  * **Protocolo / Interfaz:** Protocolo MQTT 3.1.1 sobre TCP (puerto estándar 1883).
-  * **Descripción:** El puente publica temperatura, humedad y estado de actuadores; además publica el objeto completo en `smartegg/{id}/sensores/lectura` para que el backend lo guarde. El backend publica alarmas y estado de conectividad (Last Will and Testament, LWT). Los clientes web se conectan al listener MQTT sobre WebSockets (puerto 9001).
-
-* **6. MQTT Broker $\longrightarrow$ Frontend Web (`WebSockets` / Tiempo Real):**
-  * **Protocolo / Interfaz:** MQTT sobre WebSockets (`ws://` / `wss://` en el puerto 9001).
-  * **Descripción:** El frontend actúa como suscriptor (*Subscriber*). Mantiene un socket abierto contra el broker mediante la librería `mqtt.js` escuchando tópicos críticos. Este canal push elimina la necesidad de sondeo HTTP (*polling*) constante, permitiendo desplegar alertas sonoras y visuales en la interfaz de operador en menos de 3 segundos ante contingencias ambientales o accesos no autorizados.
-
-* **7. MQTT Broker $\longrightarrow$ Grafana (`Subscribe` / Telemetría en Vivo):**
-  * **Protocolo / Interfaz:** Data Source MQTT / WebSockets.
-  * **Descripción:** Grafana se suscribe de manera directa a los tópicos de telemetría instantánea y status LWT del broker. Esto permite actualizar en tiempo real paneles de instrumentos visuales (medidores tipo *Gauge*, gráficos de serie temporal instantáneos y estados de salud del nodo) con latencia mínima y sin sobrecargar el backend.
-
-* **8. Base de Datos $\longrightarrow$ Grafana (`Querys` / Analítica Histórica):**
-  * **Protocolo / Interfaz:** Driver nativo SQL (PostgreSQL/MySQL) sobre TCP.
-  * **Descripción:** Grafana ejecuta consultas directas de solo lectura contra el motor de base de datos relacional. Mediante agregaciones SQL (`AVG`, `MAX`, `MIN`), nutre tableros de analítica avanzada que muestran tendencias históricas semanales, duraciones acumuladas de alarmas térmicas y registros de acceso de los operadores a lo largo de los lotes de incubación.
-
-### 2.3 Flujo Integrado de Datos Extremo a Extremo
-1. El microcontrolador envía periódicamente una línea JSON estructurada por UART al puente serial.
-2. El puente publica telemetría y actuadores por MQTT, además de la muestra completa en `sensores/lectura`.
-3. El suscriptor MQTT del backend persiste la lectura en PostgreSQL y gestiona intervalos de alarma térmica.
-4. El backend publica alarmas y conectividad; `status` usa Last Will and Testament (LWT) con `offline`.
-5. Grafana utiliza MQTT para el dashboard en vivo y PostgreSQL para analítica histórica. Next.js recibe telemetría por MQTT sobre WebSockets.
-
-> **Estandarización temporal:** Todos los timestamps se publican y almacenan en formato UTC / ISO 8601 para garantizar consistencia. Ambos dashboards en Grafana operan con `timezone: browser`, adaptando automáticamente las series temporales al huso horario del operador.
-
-### 2.4 Flujo de telemetría y alarmas del frontend: MQTT y REST administrativo
-
-El frontend (Next.js / React / TypeScript) mantiene **dos clientes de transporte separados**: MQTT para el flujo en vivo y REST para operaciones administrativas bajo demanda.
-
-* **Cliente MQTT (alarmas y eventos en vivo):** implementado con la librería `mqtt.js` sobre WebSocket (`ws://localhost:9001`). Se suscribe a los tópicos críticos del broker:
-  * `smartegg/SE-01/sensores/temperatura` y `.../sensores/humedad` — telemetría ambiental.
-  * `smartegg/SE-01/alarmas/critica` — condiciones fuera de rango.
-  * `smartegg/SE-01/puerta/evento` — apertura/cierre de cabina.
-  * `smartegg/SE-01/status` — disponibilidad del nodo (LWT).
-  * `smartegg/SE-01/actuadores/estado` — estados de actuadores y rotación.
-
-  Al recibir un mensaje de `alarmas/critica` con `activa: true`, la interfaz propaga el evento en menos de 3 segundos: banner **ALARMA ACTIVA**, *toast* emergente, indicador sonoro (desactivable) y actualización del centro de alarmas con la distinción entre eventos **activos** y **resueltos**. La notificación se dispara por *transición* de estado (activa → resuelta), no por cada lectura, para evitar repetir sonidos mientras la condición permanece fuera de rango.
-
-* **Cliente HTTP/REST (operaciones administrativas):** implementado con `fetch` hacia la API de Flask:
-  * Consultas: `GET /huevos`, `GET /alarmas`, `GET /accesos-puerta`, `GET /operadores`, `GET /reporte`.
-  * Operaciones: `POST /huevo` (registro de ficha/lote) y `POST /puerta` (apertura/cierre).
-
-  Este cliente alimenta las vistas administrativas y el generador de reportes PDF. La telemetría y los gráficos recientes se actualizan por suscripción MQTT; no usan sondeo HTTP.
-
-| Canal | Rol | Mecanismo | Latencia esperada |
-|---|---|---|---|
-| MQTT (WebSocket) | Telemetría, actuadores, alarmas, eventos de puerta y estado del nodo | Publicador/suscriptor vía broker | En vivo (push, sin recarga) |
-| HTTP/REST | Lotes y operaciones administrativas | Petición/respuesta con códigos de estado | Bajo demanda |
-
-Esta separación mantiene toda la telemetría y el control en MQTT; las solicitudes REST se reservan para datos y operaciones administrativas.
-
-## 3. Documentación de la Jerarquía de Topics MQTT
-
-| Topic | QoS | Retained | Publicador | Suscriptores | Contenido / Payload |
-|---|:---:|:---:|---|---|---|
-| `smartegg/SE-01/sensores/temperatura` | 0 | No | Puente serial | Grafana, Frontend | `{valor, unidad, timestamp}` |
-| `smartegg/SE-01/sensores/humedad` | 0 | No | Puente serial | Grafana, Frontend | `{valor, unidad, timestamp}` |
-| `smartegg/SE-01/sensores/lectura` | 1 | No | Puente serial | Backend MQTT | Lectura completa para persistencia |
-| `smartegg/SE-01/actuadores/estado` | 1 | Sí | Puente serial | Grafana, Frontend | `{foco, ventilador, rotacion_grados}` |
-| `smartegg/SE-01/alarmas/critica` | 1 | Sí | Backend Flask | Grafana, Frontend | `{activa, tipo, severidad, inicio_at, resolucion_at}` |
-| `smartegg/SE-01/status` | 1 | Sí | Backend Flask (LWT Broker) | Grafana, Frontend | `{estado, valor}`; `offline`/`valor=0` es el LWT |
-| `smartegg/SE-01/puerta/evento` | 1 | No | Puente serial/backend | Grafana, Frontend | `{id, accion, operador_id, cantidad_huevos, timestamp}` |
-| `smartegg/SE-01/control/energia` | 1 | No | Frontend | Servicio de energía, puente serial | Límite de potencia y temporizador |
-| `smartegg/SE-01/control/actuadores` | 1 | Sí | Servicio de energía | Puente serial | Última orden: `{accion: APAGAR}` al vencer; `{accion: REANUDAR}` al programar o cancelar |
-
-* **Detalles de configuración:** Broker Mosquitto con listener TCP en puerto 1883 y listener WebSocket en puerto 9001. Documentación completa de pruebas y esquemas en `infra/mqtt/README.md`.
-
-
-## 4. Modelo entidad-relación de la base de datos.
-
-![Diagrama ER SmartEgg](imagenes/DiagramaER.png)
-
-Diagrama interactivo (dbdiagram.io): https://dbdiagram.io/d/6a9e6fc850ad2c46dc5a2298
-
-### Entidades
-
-| Tabla | Descripción |
-|---|---|
-| `nodos` | Incubadoras registradas en el sistema |
-| `operadores` | Usuarios con acceso a apertura/cierre (Operador 1, Operador 2, Admin) |
-| `lotes` | Fichas de huevos ingresados, asociadas a un nodo y opcionalmente a un operador |
-| `lecturas` | Telemetría histórica: temperatura, humedad, actuadores, rotación |
-| `alarmas` | Eventos críticos con severidad, inicio y resolución |
-| `accesos_puerta` | Registro de apertura/cierre de cabina con cantidad de huevos |
-
-### Relaciones clave
-- Un `nodo` tiene muchos `lotes`, `lecturas`, `alarmas` y `accesos_puerta`.
-- Un `operador` puede estar asociado a varios `lotes` (quien lo ingresó) y varios `accesos_puerta` (quien abrió/cerró).
-- Cada `lectura` y `alarma` puede vincularse opcionalmente a un `lote` (`lote_id` nullable, se conserva el histórico aunque el lote termine).
-
-
-## 5. API Contracts del Backend
-
-El contrato OpenAPI completo del sistema se encuentra definido en [`openapi.yaml`](openapi.yaml).
-
-### 5.1 Catálogo de Endpoints Principales
-* `GET /health`: Comprobación de estado del servicio y conectividad con la base de datos.
-* `POST /huevo` / `GET /huevos`: Registro y consulta de estados de huevos por posición.
-* `GET /alarmas`: Registro de eventos críticos e intervalos de superación de umbral.
-* `GET /operadores`: Listado de usuarios autorizados (Operador 1, Operador 2, Administrador).
-* `POST /puerta` / `GET /accesos-puerta`: Bitácora física de eventos de apertura y cierre de cabina.
-* `GET /reporte`: Generación y descarga del informe consolidado en PDF.
-
-## 6. Capturas de los Dashboards de Grafana
-
-Los dashboards se provisionan automáticamente mediante archivos de configuración en el despliegue:
-
-* **SmartEgg - Monitoreo MQTT en Tiempo Real:** Panel de baja latencia conectado al datasource MQTT streaming. Despliega temperatura, humedad, estado de foco/ventilador, rotación del servomotor, KPI de alarmas activas, estado de conexión (LWT) y el último evento registrado en la puerta.
-![monitoreo](imagenes/monitoreo-MQTT.png)
-
-* **SmartEgg - Analítica Histórica:** Panel de agregación conectado mediante SQL directo a PostgreSQL. Despliega tendencias de temperatura/humedad por lote, métricas de ocupación, valores mínimos/máximos/promedio, duración acumulada de alarmas y accesos de operadores.
-![analitica-historica](imagenes/analitica-historica1.png)
-![analitica-historica](imagenes/analitica-historica2.png)
-
-### 6.1 Evidencias del broker MQTT
-
-Pruebas ejecutadas con `mosquitto_sub` dentro del contenedor del broker:
-
-* **Telemetría:** recepción de temperatura, humedad, actuadores, alarmas y estado del nodo.
-  ![Evidencia de telemetría MQTT](imagenes/MQTT_Telemetria.png)
-* **Retained:** un suscriptor nuevo recibe inmediatamente el último estado retenido del nodo.
-  ![Evidencia de mensaje retained](imagenes/MQTT_Retained.png)
-* **LWT:** al detener abruptamente el cliente de prueba, el broker publica `offline` con `valor: 0` y `motivo: lwt`.
-  ![Evidencia de LWT offline](imagenes/MQTT_LWT.png)
-
-La prueba LWT utiliza el topic aislado `smartegg/ROL4-TEST/status` para no interrumpir el nodo de demostración; el backend utiliza `smartegg/SE-01/status`.
-
-## 7. Explicación de los frameworks/librerías y enlace al video demostrativo
-
-### 7.1 Visualización interactiva con p5.js
-
-El dashboard independiente usa **p5.js 1.9.0** para dibujar gráficas 2D dentro de un `canvas`. El archivo fuente es `dashboard_p5/index.html`; la misma página está disponible localmente en `frontend/public/visualizacion_p5.html` y se publica como sitio estático en Azure Blob Storage. En el panel Next.js, el botón **Abrir dashboard p5.js** abre esta interfaz en una pestaña nueva. No se incrusta dentro de la tarjeta del modelo 3D.
-
-La página presenta lecturas ambientales, clasificación de visión, estado del modelo ML, actuadores y consumo eléctrico. El canvas permite elegir entre las tendencias de temperatura, humedad y potencia, y muestra detalles al pasar sobre las lecturas. Los valores empiezan vacíos y aparecen cuando llegan mensajes; no se muestran mediciones de ejemplo.
-
-* `setup()` crea el lienzo y abre la conexión al broker por MQTT sobre WebSockets.
-* `draw()` dibuja la variable seleccionada y actualiza el cursor y la lectura resaltada.
-* `createCanvas()` crea el lienzo según el tamaño disponible y `windowResized()` lo adapta al cambiar la ventana.
-* Los botones de selección cambian entre temperatura, humedad y potencia. El control deslizante de energía, el temporizador y la acción de desbloqueo publican órdenes MQTT.
-* El dashboard mantiene hasta 72 muestras recientes por variable en memoria local de la página.
-
-La interfaz recibe mensajes de `smartegg/{id}/sensores/temperatura`, `.../sensores/humedad`, `.../actuadores/estado`, `.../vision/estado`, `.../ml/anomalia` y `.../energia/consumo`. No consulta REST para telemetría ni para el estado de actuadores.
-
-### 7.2 Uso de Three.js
-
-El proyecto incluye las dependencias `three`, `@react-three/fiber` y `@react-three/drei`, que permiten construir escenas 3D con Three.js dentro de React. Estas herramientas son adecuadas para modelos tridimensionales, cámaras, luces, materiales y controles de navegación.
-
-Three.js, mediante `@react-three/fiber` y `@react-three/drei`, renderiza el modelo tridimensional en el panel Next.js. Esa vista es independiente del dashboard p5.js, que dibuja tendencias 2D y se abre desde el botón del encabezado del Panel.
-
-### 7.3 Gráficos recientes con Chart.js
-
-Para los gráficos de tendencias recientes se utiliza **Chart.js 4.5.1**, integrado en React mediante **react-chartjs-2**. Chart.js se seleccionó porque ofrece una API clara para construir gráficos de líneas y barras, soporta actualización de datos, tooltips, leyendas, escalas y diseño responsive, y se integra directamente con el ciclo de renderizado de los componentes React.
-
-El componente `AnalyticsCharts` utiliza las muestras recientes que mantiene `useTelemetry` a partir de los mensajes MQTT de temperatura y humedad. El gráfico se actualiza al llegar nuevas lecturas; no consulta un endpoint HTTP de historial.
-
-Actualmente se presentan dos gráficos:
-
-1. **Tendencia térmica y de humedad reciente:** gráfico de líneas que muestra temperatura en grados Celsius y humedad relativa en porcentaje a partir de muestras MQTT recibidas.
-2. **Registro de ocupación:** gráfico de barras que calcula los huevos ocupados mediante `3 - espacios_libres`, respetando la capacidad de tres posiciones de la bandeja.
-
-Chart.js registra los módulos `CategoryScale`, `LinearScale`, `PointElement`, `LineElement`, `BarElement`, `Title`, `Tooltip`, `Legend` y `Filler`. Esto permite trabajar con etiquetas de tiempo, escalas numéricas, puntos, líneas, barras, áreas rellenas, leyendas y ayudas emergentes.
-
-### 7.4 Flujo de datos de las visualizaciones
-
-El flujo implementado es el siguiente:
-
-1. El puente serial publica las muestras del microcontrolador en MQTT, incluidos los tópicos de sensores y actuadores.
-2. La lectura completa se publica en `smartegg/{id}/sensores/lectura`; el backend la recibe por MQTT y la persiste en PostgreSQL.
-3. La interfaz Next.js recibe los valores en vivo del broker mediante MQTT sobre WebSockets; el dashboard p5.js abre su propia suscripción al mismo broker.
-4. `useTelemetry` conserva una ventana de muestras recibidas para Chart.js. El dashboard p5.js mantiene hasta 72 muestras recientes por variable para su canvas.
-
-Así, Three.js representa la maqueta 3D, p5.js ofrece el dashboard interactivo de tendencias y Chart.js muestra las gráficas de la aplicación React.
-
-### 7.5 Ventajas y consideraciones técnicas
-
-* **p5.js:** crea una interfaz de gráficas 2D interactivas que se alimenta de mensajes MQTT.
-* **Chart.js:** reduce el código necesario para crear gráficos profesionales y proporciona escalas, leyendas, tooltips y adaptación responsive.
-* **Three.js:** renderiza el modelo 3D del panel React; no forma parte del dashboard p5.js.
-* **REST y `fetch`:** mantienen una integración simple para lotes y otras operaciones administrativas; la telemetría se actualiza por MQTT, sin sondeo HTTP.
-
-### 7.6 Video Demostrativo
-* **Demostración en video:** [Ver Video Demostrativo de SmartEgg (Google Drive)](https://drive.google.com/drive/folders/1w0q4TgvbBKzDrHfzG4wQCiI1_iPQEONU?usp=sharing)
-* **Plataforma:** Google Drive
-
-
-## 8. Documento comparativo HTTP vs. MQTT
-
-SmartEgg utiliza REST para operaciones administrativas bajo demanda y MQTT para telemetría, estados, controles y eventos en tiempo real.
-
-### 8.1 HTTP en IoT
-
-HTTP sigue el modelo **cliente-servidor de petición/respuesta**. El cliente realiza una solicitud (`GET`, `POST`, `PUT`, `PATCH` o `DELETE`) y el servidor responde con un código de estado y, normalmente, un JSON. En IoT, un dispositivo puede enviar mediciones mediante `POST`, pero el cliente debe volver a consultar para detectar cambios nuevos.
-
-En SmartEgg, REST se utiliza para lotes, consultas administrativas, registro de eventos de puerta y generación de reportes. No existen rutas REST para consultar o registrar telemetría; esos datos viajan por MQTT.
-
-### 8.2 Optimizaciones HTTP
-
-| Técnica | Beneficio en IoT |
-|---|---|
-| `Keep-Alive` | Reutiliza la conexión TCP/TLS y reduce *handshakes*. |
-| Compresión | `gzip`/Brotli y JSON compacto reducen el payload. |
-| HTTP/2 | Multiplexa solicitudes y comprime cabeceras en una conexión. |
-| Caching | `ETag` y `Cache-Control` evitan transferir datos que no cambiaron. |
-| Batching | Agrupa varias lecturas y reduce solicitudes repetidas. |
-| CoAP | Alternativa REST ligera para dispositivos restringidos, normalmente sobre UDP. |
-
-Estas técnicas optimizan HTTP, pero no lo convierten en un canal *push*; para alarmas inmediatas a varios consumidores se utiliza MQTT.
-
-### 8.3 MQTT en SmartEgg
-
-MQTT usa el modelo **publish/subscribe**: el puente serial publica en los tópicos del nodo, Mosquitto los distribuye y Grafana/frontend reciben los mensajes sin consultarlos repetidamente. El backend se suscribe a la lectura completa para persistirla y publica estado y alarmas.
-
-* Temperatura y humedad: QoS 0, porque son lecturas frecuentes.
-* Actuadores, alarmas, status y puerta: QoS 1 para entrega al menos una vez.
-* Status, actuadores y alarma: mensajes `retained` para entregar el último estado a nuevos suscriptores.
-* `smartegg/SE-01/status`: LWT retenido con `estado=offline`; al conectar se publica `estado=online`.
-* El objeto completo de cada lectura viaja por MQTT hacia el suscriptor del backend y se conserva en PostgreSQL; el dashboard recibe el estado directamente del broker.
-
-### 8.4 Tabla comparativa
-
-| Criterio | HTTP/REST | MQTT |
-|---|---|---|
-| Comunicación | Petición/respuesta. | Publicación/suscripción mediante broker. |
-| Overhead | Cabeceras y estructura más pesadas. | Encabezado pequeño y payload ligero. |
-| Energía/banda | Puede aumentar con *polling* frecuente. | Menor tráfico repetido y conexión persistente. |
-| Eventos | El cliente debe consultar. | Entrega *push* a suscriptores. |
-| Desconexiones | Requiere timeout y reintentos de aplicación. | QoS, retained y LWT ayudan a recuperar estado y detectar caídas. |
-| Escalabilidad | Cada consumidor consulta al servidor. | El broker distribuye a múltiples consumidores. |
-| Historial | Requiere una base de datos externa. | `Retained` guarda solo el último estado; el histórico requiere PostgreSQL. |
-| Uso en SmartEgg | CRUD administrativo, consultas de lotes/operadores y PDF. | Telemetría, actuadores, alarmas, puerta y status para Grafana/frontend. |
-
-### 8.5 Justificación de la arquitectura
-
-Se eligió **MQTT para telemetría y eventos** porque son mensajes pequeños y frecuentes que deben llegar en vivo a Grafana y al frontend. El broker desacopla los componentes y permite usar QoS 1, `retained` y LWT.
-
-Se eligió **REST/HTTP para CRUD administrativo y reportes** porque registrar lotes y consultar datos administrativos requiere una respuesta explícita, validaciones y códigos de estado. Las órdenes y estados de actuadores se envían por MQTT.
-
-Por tanto, el flujo queda separado así: **serial** entre microcontrolador y puente, **MQTT** para telemetría, control y distribución en tiempo real, **REST/HTTP** para operaciones administrativas y **PostgreSQL** para persistencia histórica.
-
-## 9. Instrucciones y evidencia de la orquestación con Docker.
-
-### 9.1 Requisitos previos
-- Docker Desktop instalado y en ejecución.
-- Archivo `.env` creado a partir de `.env.example` (`cp .env.example .env`).
-
-### 9.2 Comandos de despliegue
-
-```bash
-# 1. Copiar variables de entorno
-cp .env.example .env
-
-# 2. Levantar todos los servicios (primera vez, construye las imágenes)
-docker compose up -d --build
-
-# 3. Verificar que los 5 servicios estén arriba
-docker compose ps
-
-# 4. Revisar que la base de datos inicializó el schema correctamente
-docker compose logs postgres
-```
-
-### 9.2.1 Configuración de Modo Simulado vs. Hardware Real
-* **Modo Simulado:** Para probar el circuito completo sin el Arduino conectado, se define `SIMULATE_TELEMETRY=true` en `.env` y se recrea el contenedor:
-  ```powershell
-  docker compose up -d --force-recreate backend
-  Invoke-RestMethod http://localhost:5000/health | ConvertTo-Json
+## 1. Descripción de la Solución y Objetivos de la Fase 3
+
+### 1.1 Contexto y Evolución del Sistema hacia la Fase 3
+En las fases anteriores, el sistema **SmartEgg** se desarrolló como una incubadora avícola automatizada enfocada en la telemetría elemental y el control reactivo: lectura de temperatura y humedad ambiental (sensor DHT11), conmutación de actuadores térmicos mediante relés (foco calefactor y ventilador extractor), volteo mecánico mediante servomotor ($\pm45^\circ$), detección de presencia mediante interruptores mecánicos y un registro centralizado sobre una base de datos relacional y un broker MQTT local.
+
+Sin embargo, ese esquema inicial presentaba tres limitaciones operativas críticas:
+1. **Supervisión exclusivamente reactiva:** El sistema solo reaccionaba a fallas ambientales una vez que la temperatura o humedad ya se encontraban fuera de rango, sin capacidad de predecir desviaciones sutiles derivadas de desgaste mecánico o descalibración del sensor.
+2. **Ceguera visual de bioseguridad:** El sistema era incapaz de reconocer qué había dentro de la cabina. Si un operario dejaba una herramienta (tijeras, pinzas metálicas), basura plástica o si ingresaba una plaga, el sistema encendía el foco calefactor a ciegas, arriesgando incendios, gases tóxicos y muerte embrionaria.
+3. **Dependencia de infraestructura local:** La ausencia de una nube pública restringía la escalabilidad, la supervisión remota distribuida y la resiliencia del almacenamiento de métricas.
+
+---
+
+### 1.2 Objetivos Específicos de la Fase 3: Autonomía, Predicción y Nube
+Para superar estas barreras, la **Fase 3** redefine a SmartEgg como un **sistema ciberfísico autónomo, predictivo y distribuido en la nube**, cumpliendo los siguientes objetivos específicos:
+* **Percepción Visual y Bioseguridad Activa en el Edge:** Incorporar visión computacional en tiempo real con OpenCV para clasificar el estado del habitáculo (`huevo`, `objeto_extrano`, `vacio`) y ejecutar el bloqueo físico y digital inmediato ante cuerpos no autorizados al iniciar el ciclo de incubación.
+* **Mantenimiento Predictivo con Machine Learning:** Desplegar un modelo de aprendizaje automático no supervisado (*Isolation Forest*) entrenado con scikit-learn, capaz de inferir desviaciones anómalas multivariables en tiempo real antes de que alcancen umbrales críticos de alarma física.
+* **Gestión y Eficiencia Energética en Tiempo Real:** Integrar el modelado, cálculo y supervisión continua de potencia activa instantánea ($W$) y energía acumulada ($kWh$), con parametrización de límites de sobreconsumo de seguridad y temporizadores programados de desconexión.
+* **Migración y Despliegue Cloud Distribuido (AWS / Azure):** Centralizar la persistencia, analítica y mensajería en una máquina virtual Linux en la nube con Docker Compose (Mosquitto MQTT, PostgreSQL 16, Backend Flask, ML Service y Grafana 12), complementado con hosting estático de alta disponibilidad en AWS S3 o Azure Blob Storage para el dashboard interactivo en p5.js.
+* **Cumplimiento Estricto de la Restricción No-API para Actuadores:** Todo control bidireccional opera exclusivamente por MQTT (QoS 1, retain), reservando llamadas HTTP/REST únicamente a lecturas y generación de reportes PDF.
+
+---
+
+### 1.3 Restricción Técnica Crítica: Control Exclusivo por MQTT
+> [!CAUTION] 
+> Queda **estrictamente prohibido el uso de APIs REST para controlar sensores y actuadores (-100% de penalización en rúbrica)**.  
+> Todo el control bidireccional (apertura/cierre de puerta, encendido/apagado de actuadores, órdenes de bloqueo de seguridad y temporizadores de energía) opera **únicamente a través del Broker MQTT público en la nube**.  
+> Las llamadas HTTP/REST del backend quedan reservadas exclusivamente para consultas de sólo lectura (`GET /datos`, `GET /historial`) y la generación transaccional del reporte PDF.
+
+---
+
+### 1.4 Diagrama de Arquitectura General
+![Diagrama-arquitectura](imagenes/DiagramaArquitectura.png)
+
+---
+
+### 1.5 Flujo de Datos Distribuido Extremo a Extremo
+1. **Adquisición Físico-Mecánica:** El microcontrolador Arduino Mega 2560 muestrea cada 2 segundos las variables físicas de cabina y emite una trama JSON estructurada por UART (`{"temperatura": 37.5, "humedad": 58.0, "foco": "ON", "fan": "OFF", "rotacion_grados": 45, "espacios_libres": 0}`).
+2. **Puente Edge a la Nube:** El script [`serial_bridge.py`](../backend/serial_bridge.py) recibe los datos seriales y los despacha mediante MQTT hacia el broker en la nube (`smartegg/SE-01/sensores/...` y `smartegg/SE-01/actuadores/estado`). A su vez, escucha el tópico `smartegg/SE-01/control/#` para traducir comandos MQTT a órdenes seriales (`CMD:BLOQUEAR`, `CMD:DESBLOQUEAR`).
+3. **Inferencia Visual en Vivo:** De forma concurrente, el módulo [`detector_vision.py`](../vision/detector_vision.py) captura el fotograma de la cámara interna, extrae descriptores morfológicos y de color HSV (46 características) y clasifica la escena con el modelo entrenado. Si el ciclo está activo y detecta un `objeto_extrano`, publica de inmediato en `smartegg/SE-01/control/bloqueo` con `{bloquear: true}` y en `smartegg/SE-01/alarmas/critica`.
+4. **Evaluación de Machine Learning:** El contenedor [`ml_service.py`](../ml/ml_service.py) en la nube escucha la telemetría, mantiene una ventana deslizante de 30 muestras (1 minuto) y evalúa el vector multivariable con el modelo *Isolation Forest*. Si el score supera el umbral optimizado (`-0.0052`), publica la alerta en `smartegg/SE-01/ml/anomalia`.
+5. **Cálculo y Gestión de Energía:** Se calcula la potencia instantánea ($W$) con base en las especificaciones nominales de los actuadores activos (Foco 60W, Fan 5W, Motor 2.5W, Base 3W) e integra el consumo horario ($kWh$), publicando en `smartegg/SE-01/energia/consumo`.
+6. **Observabilidad Simultánea:** 
+   - **Grafana:** Muestra el streaming MQTT en vivo (15 paneles) y evalúa alertas unificadas sobre PostgreSQL cada 10 segundos.
+   - **Dashboard p5.js:** Conectado por WebSockets (`ws://<IP>:9001`), renderiza la incubadora interactiva 2D/3D, controla el límite de potencia y se bloquea visualmente si se detecta un objeto intruso.
+
+---
+
+## 2. Capas del Framework IoT y Arquitectura Distribuida
+
+La arquitectura distribuida interconecta cuatro planos operacionales a través de Internet:
+
+
+![capas-iot](imagenes/Arquitectura_IoT.png)
+
+### 2.1 Capa de Percepción y Actuación (Hardware)
+Esta capa interactúa directamente con el ambiente físico de la cámara de incubación:
+* **Microcontrolador:** Arduino Mega 2560 gestionando lectura de sensores, control de relés y la lógica de bloqueo autónomo.
+* **Sensor de Temperatura y Humedad:** DHT11 en Pin Digital 2 (resolución de 0.1°C y 1% de humedad relativa).
+* **Sensor de Ocupación:** 3 interruptores de fin de carrera en pines analógicos A0, A1 y A2 conectados a la bandeja rotatoria.
+* **Módulo RFID:** RC522 sobre bus SPI (Pines 5, 53, 50, 51, 52) para control de acceso de operadores autorizados mediante llavero RFID.
+* **Actuador Calefactor:** Relé optoacoplado de 1 canal en Pin 7 gobernando un foco incandescente de $60\text{ W} / 120\text{ VAC}$.
+* **Actuador de Alivio Térmico:** Ventilador DC 12V ($5\text{ W}$) en Pin 6 mediante relé/transistor.
+* **Mecanismo de Volteo de Huevos:** Servomotor metálico MG996R en Pin 9 con ciclo de inclinación a $\pm45^\circ$ cada 60 segundos.
+* **Dispositivos de Bloqueo y Alarma Física:**
+  - Buzzer sonoro de alta frecuencia en Pin 8.
+  - Señal luminosa crítica en LED de Pin 13.
+  - Pantalla LCD 16x2 con adaptador I2C (dirección `0x27`) que exhibe de inmediato `!BLOQUEO VISION! OBJETO INVALIDO` ante un bloqueo.
+* **Cámara de Video:** Dispositivo de captura en tiempo real (cámara USB o smartphone montado apuntando al interior del nido a través de *Iriun Webcam*).
+
+![hardware](../../Practica1/docs/imagenes/prototipo1.jpeg)
+
+---
+
+### 2.2 Capa de Red y Conectividad (MQTT)
+La comunicación IoT es **100% asíncrona y orientada a eventos**, utilizando el protocolo **MQTT 3.1.1**:
+* **Broker Central:** Eclipse Mosquitto 2.0 corriendo en la máquina virtual Linux de la nube.
+* **Puertos Expuestos:**
+  - `1883 TCP`: Para enlaces M2M entre el nodo físico (túnel serial), el módulo de visión, el microservicio ML y el backend.
+  - `9001 WebSocket`: Para el streaming directo hacia los clientes web en el navegador (Grafana y dashboard p5.js).
+* **Políticas de Resiliencia:**
+  - **QoS 1:** Utilizado en actuadores, alarmas críticas, eventos de bloqueo y puerta para garantizar al menos una entrega (*At least once*).
+  - **Retained Messages:** Usados en `status`, `actuadores/estado`, `control/bloqueo` y `ml/anomalia`, permitiendo que cualquier cliente que se conecte reciba el último estado inmediatamente.
+  - **Last Will and Testament (LWT):** El broker publica automáticamente `{"estado":"offline","valor":0}` en `smartegg/SE-01/status` si el nodo o el túnel pierden conexión abruptamente.
+
+---
+
+### 2.3 Jerarquía Completa de Tópicos MQTT del Sistema
+
+A continuación se detalla la tabla de todos los tópicos del sistema, divididos entre los tópicos heredados de Fase 2 y los **4 nuevos tópicos requeridos para la Fase 3**, especificando para cada uno su QoS, estado de Retención, **Tipo de Dato**, Publicador, Suscriptores y Estructura formal del Payload:
+
+| Tópico MQTT | QoS | Retained | Tipo de Dato | Publicador | Suscriptores | Estructura del Payload JSON / Valores |
+| :--- | :---: | :---: | :--- | :--- | :--- | :--- |
+| **`smartegg/SE-01/status`** *(Heredado)* | 1 | Sí | `JSON {nodo_id: string, estado: string, valor: int, timestamp: string}` | Backend / LWT Mosquitto | Grafana, Frontend, p5.js | `{"nodo_id":"SE-01","estado":"online","valor":1,"timestamp":"2026-10-22T10:00:00Z"}` *(offline en LWT)* |
+| **`smartegg/SE-01/sensores/temperatura`** *(Heredado)* | 0 | No | `JSON {nodo_id: string, valor: float, unidad: string, timestamp: string}` | Túnel Serial / Backend | Grafana, Frontend, ML | `{"nodo_id":"SE-01","valor":37.5,"unidad":"°C","timestamp":"2026-10-22T10:00:00Z"}` |
+| **`smartegg/SE-01/sensores/humedad`** *(Heredado)* | 0 | No | `JSON {nodo_id: string, valor: float, unidad: string, timestamp: string}` | Túnel Serial / Backend | Grafana, Frontend, ML | `{"nodo_id":"SE-01","valor":58.0,"unidad":"%","timestamp":"2026-10-22T10:00:00Z"}` |
+| **`smartegg/SE-01/sensores/lectura`** *(Persistencia)* | 1 | No | `JSON {nodo_id: string, temperatura: float, humedad: float, foco: string, ...}` | Túnel Serial (`serial_bridge.py`) | Ingestor BD (`mqtt_ingestion.py`) | `{"nodo_id":"SE-01","temperatura":37.5,"humedad":58.0,"foco":"ON","fan":"OFF",...}` |
+| **`smartegg/SE-01/actuadores/estado`** *(Heredado)* | 1 | Sí | `JSON {nodo_id: string, foco: string, ventilador: string, rotacion_grados: float, espacios_libres: int}` | Túnel Serial / Backend | Grafana, Frontend, ML, Gestor Energía | `{"nodo_id":"SE-01","foco":"ON","ventilador":"OFF","rotacion_grados":45.0,"espacios_libres":0}` |
+| **`smartegg/SE-01/alarmas/critica`** *(Heredado)* | 1 | Sí | `JSON {id: string, tipo: string, severidad: string, mensaje: string, activa: boolean}` | Backend / OpenCV | Grafana, Frontend, p5.js | `{"id":"ALM-01","tipo":"BLOQUEO_SEGURIDAD_VISION","severidad":"CRITICA","mensaje":"Objeto no autorizado detectado","activa":true}` |
+| **`smartegg/SE-01/puerta/evento`** *(Heredado)* | 1 | No | `JSON {id: int, accion: string, operador_id: int, cantidad_huevos: int, timestamp: string}` | Túnel Serial (RFID RC522) | Grafana, Frontend | `{"id":1,"accion":"ABRIR","operador_id":1,"cantidad_huevos":0,"timestamp":"2026-10-22T10:00:00Z"}` |
+| **`smartegg/SE-01/ciclo/control`** *(Heredado)* | 1 | Sí | `JSON {nodo_id: string, activo: boolean}` | Dashboard / Operador | Arduino (Serial), OpenCV | `{"nodo_id":"SE-01","activo":true}` |
+| **`smartegg/SE-01/control/puerta`** *(Heredado)* | 1 | No | `JSON {nodo_id: string, accion: string, operador_id: int}` | Dashboard / Operador | Arduino (Serial Bridge) | `{"nodo_id":"SE-01","accion":"ABRIR","operador_id":1}` |
+| **`smartegg/SE-01/vision/estado`** ⭐ *(NUEVO 1)* | 0 | No | `JSON {nodo_id: string, clase: string, confianza: float, bloqueado: boolean, motivo: string}` | OpenCV (`detector_vision.py`) | Grafana, Backend, p5.js | `{"nodo_id":"SE-01","clase":"huevo","confianza":0.985,"bloqueado":false,"motivo":"operacion_normal"}` *(Clases: huevo, objeto_extrano, vacio)* |
+| **`smartegg/SE-01/control/bloqueo`** ⭐ *(NUEVO 2)* | 1 | Sí | `JSON {nodo_id: string, bloquear: boolean, motivo: string, alarma_fisica: boolean}` | OpenCV / Operador | Arduino (Serial), p5.js, Grafana | `{"nodo_id":"SE-01","bloquear":true,"motivo":"objeto_extrano_detectado","alarma_fisica":true}` |
+| **`smartegg/SE-01/ml/anomalia`** ⭐ *(NUEVO 3)* | 1 | Sí | `JSON {nodo_id: string, anomalia: boolean, valor: int, score: float, umbral: float, temp: float}` | Microservicio ML (`ml_service.py`) | Grafana, p5.js, Backend | `{"nodo_id":"SE-01","anomalia":false,"valor":0,"score":-0.0125,"umbral":-0.0052,"temp":37.5}` |
+| **`smartegg/SE-01/energia/consumo`** ⭐ *(NUEVO 4)* | 0 | No | `JSON {nodo_id: string, watts: float, potencia: float, kwh: float, limite_watts: float, alerta_consumo: boolean}` | Backend / Gestor Energía | Grafana, p5.js | `{"nodo_id":"SE-01","watts":68.5,"potencia":68.5,"kwh":0.142,"limite_watts":80.0,"alerta_consumo":false}` |
+| **`smartegg/SE-01/control/energia`** *(Gestión)* | 1 | No | `JSON {limite_watts: float, temporizador_minutos: int, timestamp: string}` | Dashboard p5.js | Gestor Energía / Backend | `{"limite_watts":85.0,"temporizador_minutos":30,"timestamp":"2026-10-22T10:00:00Z"}` |
+| **`smartegg/SE-01/control/actuadores`** *(Energía)* | 1 | Sí | `JSON {accion: string, motivo: string}` | Gestor Energía (`energy_service.py`) | Arduino (Serial Bridge) | `{"accion":"APAGAR","motivo":"temporizador_vencido"}` |
+
+---
+
+### 2.4 Capa de Middleware y Procesamiento en la Nube
+El stack del servidor se orquesta mediante **Docker Compose** en una instancia virtual Linux (Ubuntu 22.04 LTS en AWS EC2 o Azure Virtual Machine):
+1. **Contenedor `mosquitto`:** Imagen `eclipse-mosquitto:2` escuchando en `0.0.0.0:1883` (TCP) y `0.0.0.0:9001` (WebSockets).
+2. **Contenedor `postgres`:** Imagen `postgres:16-alpine` con volumen persistente `postgres_data` y scripts de migración automáticos en `/docker-entrypoint-initdb.d/`.
+3. **Contenedor `backend`:** Servicio Python 3.11 con Flask, `psycopg` (driver binario v3) y cliente MQTT resiliente.
+4. **Contenedor `ml`:** Servicio de inferencia continua basado en scikit-learn que consume los tópicos de telemetría y evalúa cada muestra con el pipeline preentrenado.
+5. **Contenedor `grafana`:** Imagen propia basada en Grafana 12 con el plugin oficial `grafana-mqtt-datasource 1.1.0` fijado y provisionamiento de fuentes, dashboards y reglas de alerta como código.
+
+---
+
+### 2.5 Capa de Aplicación y Visualización
+* **Dashboards en Grafana Cloud / VM (`:3000`):** Dos tableros dedicados:
+  - *Dashboard en tiempo real:* Flujo de datos MQTT sin retardo.
+  - *Dashboard analítico histórico:* Consultas SQL sobre PostgreSQL con filtros de tiempo y selección de nodo.
+* **Dashboard Interactivo en p5.js:** Alojado en un servicio de almacenamiento de objetos con sitio web estático (AWS S3 Bucket o Azure Blob Storage). Se comunica directamente con el broker de la nube vía WebSockets, brindando renderizado visual 2D/3D del habitáculo, diales de consumo eléctrico y control de bloqueo interactivo.
+
+---
+
+## 3. Documentación de la Base de Datos (Modelo Entidad - Relación)
+
+### 3.1 Diagrama Entidad-Relación General
+
+A continuación se presenta el modelo relacional completo actualizado para la Fase 3, incorporando tanto las tablas maestras heredadas como las tres nuevas tablas de inteligencia (`mediciones_energia`, `registro_anomalias_ml` y `eventos_seguridad_vision`):
+
+![Diagrama-ER](imagenes/DigramaER.png)
+
+---
+
+### 3.2 Diccionario de Datos (Tablas de Inteligencia Fase 3)
+
+#### Tabla: `mediciones_energia`
+Almacena el registro continuo de consumo y potencia eléctrica calculada a partir de los estados de los actuadores y los modelos de carga.
+* `id` (`BIGSERIAL`, PK): Identificador único secuencial.
+* `nodo_id` (`TEXT`, FK `nodos.id`): Nodo de la incubadora asociada.
+* `lote_id` (`BIGINT`, FK `lotes.id`, Nullable): Lote en incubación al momento del registro.
+* `potencia_watts` (`NUMERIC(8,2)`): Potencia eléctrica total activa ($W$).
+* `consumo_kwh` (`NUMERIC(10,4)`): Energía acumulada en kilovatios-hora ($kWh$).
+* `voltaje` (`NUMERIC(6,2)`): Tensión nominal de red ($120.0\text{ V}$).
+* `corriente` (`NUMERIC(6,3)`): Intensidad de corriente calculada en Amperios ($A$).
+* `foco_watts` (`NUMERIC(6,2)`): Desglose de carga del calefactor ($60.0\text{ W}$ si `ON`, $0\text{ W}$ si `OFF`).
+* `ventilador_watts` (`NUMERIC(6,2)`): Desglose de carga del extractor ($5.0\text{ W}$ si `ON`).
+* `motor_watts` (`NUMERIC(6,2)`): Desglose del servomotor ($2.5\text{ W}$ en movimiento, $0.5\text{ W}$ en reposo).
+* `timestamp` (`TIMESTAMPTZ`): Marca temporal en formato UTC / ISO 8601.
+
+#### Tabla: `registro_anomalias_ml`
+Bitácora de inferencias predictivas emitidas por el modelo *Isolation Forest*.
+* `id` (`BIGSERIAL`, PK): Identificador único.
+* `nodo_id` (`TEXT`, FK `nodos.id`): Identificador del nodo evaluado.
+* `temperatura` (`NUMERIC(6,2)`): Temperatura al momento de la anomalía.
+* `humedad` (`NUMERIC(6,2)`): Humedad relativa de cabina.
+* `score_anomalia` (`NUMERIC(8,4)`): Puntuación de decisión continua (valores mayores indican mayor atipicidad).
+* `umbral` (`NUMERIC(8,4)`): Umbral matemático de corte (`-0.0052`).
+* `es_anomalia` (`BOOLEAN`): Bandera lógica de detección (`true` para anomalía).
+* `detalle` (`TEXT`): Diagnóstico textual explicativo (ej. "Arranque en frío", "Calentamiento brusco").
+* `timestamp` (`TIMESTAMPTZ`): Momento de la inferencia.
+
+#### Tabla: `eventos_seguridad_vision`
+Auditoría forense de eventos de intrusión visual y activación del protocolo de seguridad.
+* `id` (`BIGSERIAL`, PK): Identificador único.
+* `nodo_id` (`TEXT`, FK `nodos.id`): Nodo de incubación.
+* `objeto_detectado` (`TEXT`): Etiqueta visual identificada (`objeto_extrano`, `vacio`).
+* `confianza` (`NUMERIC(5,2)`): Nivel de certidumbre probabilística del clasificador ($0$ a $100\%$).
+* `estado_bloqueo` (`TEXT`): Estado operativo (`BLOQUEADO`, `NORMAL`).
+* `motivo` (`TEXT`): Descripción de la causa que detonó la alarma.
+* `duracion_bloqueo_segundos` (`NUMERIC(8,2)`): Tiempo que el sistema permaneció deshabilitado.
+* `timestamp` (`TIMESTAMPTZ`): Fecha y hora del evento.
+
+---
+
+### 3.3 Vistas de Compatibilidad y Resiliencia
+Para garantizar que Grafana opere sin interrupciones aun si los módulos de hardware o compañeros de equipo cargan datos en distintos momentos, la base de datos implementa 3 vistas analíticas con lógica de *fallback*:
+1. **`vista_mediciones_energia`:** Si la tabla `mediciones_energia` no tiene datos, calcula la potencia y los kWh integrados dinámicamente a partir de los campos `foco` y `ventilador` de la tabla `lecturas`.
+2. **`vista_registro_anomalias_ml`:** Extrae las anomalías registradas; si la tabla está vacía, extrae las lecturas donde `alarma = true`.
+3. **`vista_eventos_vision`:** Unifica la tabla de eventos de visión con las alarmas críticas registradas de tipo `BLOQUEO_SEGURIDAD_VISION`.
+
+---
+
+## 4. Documentación de API y Justificación "No-API" de Control
+
+### 4.1 Cumplimiento Estricto de la Restricción: "Cero APIs REST para Control"
+> [!IMPORTANT]
+> **Justificación Arquitectónica del Esquema No-API para Control:**
+> * **Penalización Académica:** La rúbrica del curso establece explícitamente una penalización del **-100% de la calificación** si se emplean APIs REST (HTTP POST/PUT/PATCH) para gobernar actuadores.
+> * **Inadecuación de HTTP/REST para Control Ciberfísico:** El protocolo HTTP es síncrono, basado en petición-respuesta cliente-servidor (*request-response*) y sin estado (*stateless*). En un sistema ciberfísico crítico como SmartEgg:
+>   - Una parada de emergencia por presencia de un objeto extraño requiere latencia submilisegundo y difusión simultánea (*multicast/broadcast*) a todos los clientes (Arduino, interfaz web, dashboards, buzzer físico). HTTP requeriría encadenar múltiples llamadas síncronas bloqueantes sujetas a timeouts de socket.
+>   - La supervisión del estado del foco y ventilador por HTTP obligaría a un sondeo periódico continuo (*polling*), saturando el ancho de banda y la CPU del microcontrolador.
+> * **Uso Exclusivo de MQTT sobre TCP y WebSockets:**
+>   - **MQTT sobre TCP (Puerto 1883):** Utilizado para el intercambio M2M entre el nodo físico Arduino (túnel serial), el módulo de visión OpenCV, el microservicio ML y el backend. Permite entrega garantizada QoS 1, persistencia del último comando conocido (*Retained messages*) y notificación automática de caída del enlace (*Last Will and Testament*).
+>   - **MQTT sobre WebSockets (Puerto 9001):** Utilizado por las aplicaciones de navegador (el dashboard interactivo en p5.js y el datasource oficial de Grafana). Permite a los clientes web suscribirse a tópicos y enviar comandos de energía y desbloqueo de forma nativa como clientes MQTT puros sin pasar por ningún endpoint HTTP intermedio.
+
+---
+
+### 4.2 Endpoints REST Exclusivos de Consulta y Reporte (OpenAPI 3.0)
+
+El contrato formal OpenAPI 3.0 se localiza en [`docs/openapi.yaml`](openapi.yaml). Los endpoints REST del backend expuestos en el puerto 5000 (consumidos por el portal web en el puerto 3001) son **exclusivamente de lectura analítica y descarga de documentos**, respetando al 100% la prohibición de control:
+
+| Método | Endpoint | Tipo de Operación | Descripción |
+|---|---|:---:|---|
+| GET | `/health` | Lectura / Monitor | Chequeo de salud de BD PostgreSQL, Broker MQTT y Túnel Serial |
+| GET | `/datos` | Lectura Analítica | Última muestra de telemetría del nodo en BD |
+| GET | `/historial` | Lectura Analítica | Muestras históricas de telemetría (parámetro `limit`) |
+| POST | `/huevo` | Transaccional BD | Registro de nueva ficha de lote de incubación |
+| GET | `/huevos` | Lectura Analítica | Listado de lotes históricos registrados |
+| GET | `/alarmas` | Lectura Analítica | Listado de alarmas e intervalos de inicio/resolución |
+| GET | `/operadores` | Lectura Analítica | Listado de operarios autorizados por RFID |
+| GET | `/accesos-puerta` | Lectura Forense | Historial de aperturas/cierres físicos de cabina |
+| GET | `/reporte` | Reportería Binaria | Generación y descarga al vuelo del reporte formal en PDF |
+
+#### Especificación de Endpoints Principales:
+
+##### 1. `GET /health`
+* **Propósito:** Healthcheck para monitores de contenedores y orquestación.
+* **Respuesta 200 OK:**
+  ```json
+  {
+    "estado": "ok",
+    "database": "up",
+    "mqtt": "connected",
+    "serial": "receiving",
+    "timestamp": "2026-10-22T10:00:00Z"
+  }
   ```
-  Para que las lecturas aparezcan en la analítica por lote, registre primero un lote y defina `SIMULATION_LOT_ID=<id_del_lote>` en `.env` antes de recrear el backend.
 
-### 9.3 Servicios y accesos
+##### 2. `GET /datos`
+* **Propósito:** Retorna la telemetría más reciente persistida en PostgreSQL.
+* **Respuesta 200 OK:**
+  ```json
+  {
+    "nodo_id": "SE-01",
+    "temperatura": 37.5,
+    "humedad": 58.0,
+    "foco": "ON",
+    "ventilador": "OFF",
+    "rotacion_grados": 45.0,
+    "espacios_libres": 0,
+    "alarma": false,
+    "timestamp": "2026-10-22T10:00:00Z"
+  }
+  ```
 
-| Servicio | Contenedor | Puerto | URL/Acceso |
-|---|---|---|---|
-| Base de datos | postgres-1 | 5432 | `postgresql://smartegg:***@localhost:5432/smartegg` |
-| Broker MQTT | mosquitto-1 | 1883 / 9001 | `mqtt://localhost:1883`, WebSocket `ws://localhost:9001` |
-| Backend API | backend-1 | 5000 | http://localhost:5000 |
-| Grafana | grafana-1 | 3000 | http://localhost:3000 |
-| Frontend | frontend-1 | 3001 | http://localhost:3001 |
+##### 3. `GET /historial?limit=50`
+* **Propósito:** Recupera series temporales históricas para graficación.
+* **Parámetros Query:** `limit` (entero, por defecto 100, máx 1000).
+* **Respuesta 200 OK:** Arreglo JSON con los objetos históricos de telemetría.
 
-### 9.4 Evidencia de funcionamiento
+##### 4. `POST /huevo`
+* **Propósito:** Da de alta una ficha de lote de incubación en la base de datos (no activa actuadores).
+* **Cuerpo de la Petición (JSON):**
+  ```json
+  {
+    "lote": "LOTE-2026-01",
+    "etiqueta": "Huevos Raza Rhode Island",
+    "cantidad": 3,
+    "tecnico": "Operador 1",
+    "required_temperature": 37.5,
+    "fecha_ingreso": "2026-10-22T08:00:00Z"
+  }
+  ```
+* **Respuesta 201 Created:** `{"mensaje": "Lote registrado correctamente", "id": 1}`.
 
-**Los 5 servicios corriendo (`docker compose ps`):**
+##### 5. `GET /reporte`
+* **Propósito:** Compila dinámicamente un reporte ejecutivo formal en formato PDF con ReportLab.
+* **Respuesta 200 OK:** Archivo binario `application/pdf` con encabezados `Content-Disposition: attachment; filename="reporte_smartegg_SE-01.pdf"`.
 
-![Docker compose ps](imagenes/DockerComposePS.png)
+---
 
-**Inicialización del schema en PostgreSQL (`docker compose logs postgres`):**
+## 5. Scripts de Base de Datos para el Día de la Calificación Presencial
 
-![Logs de postgres](imagenes/LogsPostgres.png)
+Las siguientes sentencias SQL están probadas y preparadas para ejecutarse directamente en la consola `psql` o en pgAdmin durante la sustentación ante el equipo docente para auditar cada componente de la Fase 3:
 
-Se observa la creación de las 6 tablas del modelo, los 4 índices y los registros semilla (nodo `SE-01` y los operadores 1 y 2), sin errores.
-
-### 9.5 Prueba de persistencia de datos
-
-Se validó que los datos sobreviven a un reinicio de los contenedores:
-
-```bash
-docker compose down      # elimina contenedores, conserva el volumen
-docker compose up -d     # vuelve a levantar todo
-docker exec -it smartegg-postgres-1 psql -U smartegg -d smartegg -c "SELECT * FROM nodos; SELECT * FROM operadores;"
+### 5.1 Telemetría y Actuadores en Tiempo Real
+```sql
+SELECT 
+    timestamp AS "Fecha/Hora",
+    temperatura AS "Temp (°C)",
+    humedad AS "Humedad (%)",
+    foco AS "Foco",
+    ventilador AS "Ventilador",
+    rotacion_grados AS "Ángulo Servo (°)",
+    alarma AS "Alarma Activa"
+FROM lecturas
+WHERE nodo_id = 'SE-01'
+ORDER BY timestamp DESC
+LIMIT 10;
 ```
 
-![Prueba de persistencia](imagenes/PersistenciaTest.png)
+### 5.2 Bitácora de Eventos de Bloqueo por Visión Computacional
+```sql
+SELECT 
+    timestamp AS "Fecha/Hora",
+    objeto_detectado AS "Objeto Detectado",
+    confianza AS "Nivel de Certeza (%)",
+    estado_bloqueo AS "Estado del Sistema",
+    motivo AS "Motivo del Disparo",
+    duracion_bloqueo_segundos AS "Tiempo Bloqueado (s)"
+FROM eventos_seguridad_vision
+WHERE nodo_id = 'SE-01'
+ORDER BY timestamp DESC
+LIMIT 10;
+```
 
-El campo `created_at` de los registros coincide con el timestamp de la inicialización original, confirmando que el volumen `postgres_data` conserva la información entre reinicios.
+### 5.3 Histórico de Incidentes y Anomalías Predictivas (Machine Learning)
+```sql
+SELECT 
+    timestamp AS "Fecha/Hora",
+    temperatura AS "Temp (°C)",
+    humedad AS "Humedad (%)",
+    score_anomalia AS "Score Isolation Forest",
+    umbral AS "Umbral de Alerta",
+    detalle AS "Diagnóstico Predictivo"
+FROM registro_anomalias_ml
+WHERE es_anomalia = true AND nodo_id = 'SE-01'
+ORDER BY timestamp DESC
+LIMIT 10;
+```
 
+### 5.4 Consumo Energético Total por Lote de Incubación
+```sql
+SELECT 
+    l.id AS "ID Lote",
+    l.lote AS "Código Lote",
+    l.etiqueta AS "Descripción Lote",
+    l.cantidad AS "Huevos",
+    l.fecha_ingreso AS "Fecha Inicio",
+    ROUND(SUM(m.consumo_kwh)::numeric, 4) AS "Energía Total (kWh)",
+    ROUND(AVG(m.potencia_watts)::numeric, 2) AS "Potencia Media (W)",
+    ROUND((SUM(m.consumo_kwh) * 1.50)::numeric, 2) AS "Costo Est. (GTQ)"
+FROM lotes l
+LEFT JOIN mediciones_energia m ON l.id = m.lote_id
+WHERE l.nodo_id = 'SE-01'
+GROUP BY l.id, l.lote, l.etiqueta, l.cantidad, l.fecha_ingreso
+ORDER BY l.id DESC;
+```
 
-## 10. Capturas de GitHub evidenciando los commits del equipo.  
-A continuación se presenta la evidencia del trabajo colaborativo del equipo en el repositorio de GitHub, verificando la participación activa y el registro de commits por parte de cada integrante:  
+### 5.5 Consumo Energético Horario Integrado (Watts y kWh)
+```sql
+SELECT 
+    date_trunc('hour', timestamp) AS "Hora",
+    ROUND(AVG(potencia_watts)::numeric, 2) AS "Potencia Media (W)",
+    ROUND(SUM(consumo_kwh)::numeric, 4) AS "Energía Consumida (kWh)",
+    ROUND(AVG(corriente)::numeric, 3) AS "Corriente Media (A)"
+FROM vista_mediciones_energia
+WHERE nodo_id = 'SE-01'
+GROUP BY 1
+ORDER BY 1 DESC
+LIMIT 12;
+```
 
-![captura-commits](imagenes/commits1.png)  
-![captura-commits](imagenes/commits2.png)  
+### 5.6 Duración de Alarmas Críticas Históricas
+```sql
+SELECT 
+    tipo AS "Tipo Alarma",
+    severidad AS "Severidad",
+    mensaje AS "Descripción",
+    inicio_at AS "Inicio",
+    resolucion_at AS "Resolución",
+    ROUND(EXTRACT(EPOCH FROM (COALESCE(resolucion_at, NOW()) - inicio_at)) / 60.0, 2) AS "Duración (min)"
+FROM alarmas
+WHERE nodo_id = 'SE-01'
+ORDER BY inicio_at DESC
+LIMIT 10;
+```
 
-## 11. Manual de usuario
-[Manual-Usuario](ManualUsuario.md)
+### 5.7 Auditoría Forense de Accesos RFID a Cabina
+```sql
+SELECT 
+    ap.timestamp AS "Fecha/Hora",
+    COALESCE(op.nombre, 'Desconocido') AS "Operador",
+    ap.accion AS "Acción Realizada",
+    ap.cantidad_huevos AS "Huevos Declarados"
+FROM accesos_puerta ap
+LEFT JOIN operadores op ON op.id = ap.operador_id
+WHERE ap.nodo_id = 'SE-01'
+ORDER BY ap.timestamp DESC
+LIMIT 10;
+```
+
+---
+
+## 6. Explicación y Justificación del Valor Disruptivo
+
+### 6.1 Identificación del Valor Disruptivo
+El valor disruptivo de **SmartEgg Fase 3** radica en el **Módulo de Bioseguridad y Protección Preventiva basado en Visión Artificial por Computadora (OpenCV) acoplado a un Protocolo de Bloqueo Físico y Digital en Tiempo Real**, protegiendo la incubadora ante manipulación indebida o presencia de cuerpos extraños.
+
+![Valor-Disruptivo](imagenes/ValorDisruptivo.png)
+
+### 6.2 Justificación Técnica y Operacional
+1. **El Problema en la Industria:** En granjas avícolas, centros de investigación y criaderos comerciales, las incubadoras industriales operan "a ciegas". Sus sistemas de control son puramente térmicos. Si un operador realiza una inspección o rotación manual y olvida un objeto ajeno (un cúter, tijeras de desinfección, termómetros de mercurio rotos, llaves o plástico), el foco calefactor (60W o resistencias de 200W) se enciende automáticamente para alcanzar los 37.5°C. El calor continuo sobre plásticos o metales extraños genera:
+   - Focos de ignición e incendios en el nido.
+   - Emanación de gases tóxicos que asfixian los embriones a través de la cáscara porosa.
+   - Contaminación bacteriana cruzada irreversible.
+2. **La Solución Disruptiva de SmartEgg:** Al presionar la orden de inicio de ciclo, la cámara interna examina la escena. Si detecta la presencia de un elemento que no coincide morfológica ni cromáticamente con un huevo fértil, **el sistema aborta el encendido térmico en menos de 200 milisegundos**.
+3. **Bloqueo Holístico (Físico + Cloud):**
+   - **Físico:** El relé del foco se fuerza a estado abierto (OFF), el buzzer emite un tono de advertencia ininterrumpido en Pin 8, el LED rojo del Pin 13 se fija en alto y la pantalla LCD muestra `!BLOQUEO VISION! OBJETO INVALIDO`.
+   - **Nube y Dashboards:** Por MQTT se propaga el estado de bloqueo a Grafana (el panel de seguridad cambia a rojo crítico) y a la aplicación interactiva p5.js (la cabina digital se pinta de rojo y deshabilita los controles del operador).
+4. **Desbloqueo Seguro Supervisado:** El sistema no reanuda la operación automáticamente. Exige que el operador retire físicamente el objeto extraño y envíe una orden explícita de desbloqueo, quedando cada segundo de bloqueo registrado en la tabla `eventos_seguridad_vision` para auditoría de calidad.

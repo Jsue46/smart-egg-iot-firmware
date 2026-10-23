@@ -92,6 +92,14 @@ def main():
 
     ser = None
 
+    try:
+        client = mqtt.Client(
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            client_id=f"smartegg-bridge-{NODE_ID.lower()}",
+        )
+    except AttributeError:
+        client = mqtt.Client(client_id=f"smartegg-bridge-{NODE_ID.lower()}")
+
     def on_mqtt_message(_client, _userdata, msg):
         try:
             payload = json.loads(msg.payload.decode("utf-8"))
