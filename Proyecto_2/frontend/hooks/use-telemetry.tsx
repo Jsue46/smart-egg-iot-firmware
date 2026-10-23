@@ -187,7 +187,17 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
         const mqtt = await import("mqtt");
         if (disposed) return;
         const wsUrl = getMqttWsUrl();
-        client = mqtt.connect(wsUrl, {
+        const connectFn =
+          mqtt.connect ??
+          (mqtt as unknown as { default?: { connect?: typeof mqtt.connect } }).default?.connect ??
+          (mqtt as unknown as { default?: typeof mqtt.connect }).default;
+
+        if (typeof connectFn !== "function") {
+          console.error("[useTelemetry] Could not find connect function in mqtt import:", mqtt);
+          return;
+        }
+
+        client = connectFn(wsUrl, {
           clientId: `smartegg-dashboard-${Math.random().toString(16).slice(2)}`,
           clean: true,
           reconnectPeriod: 2_000,
@@ -220,7 +230,8 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
           setIsMqttConnected(false);
           setIsOnline(false);
         });
-        client.on("error", () => {
+        client.on("error", (err) => {
+          console.warn("[useTelemetry] MQTT error:", err);
           setIsMqttConnected(false);
           setIsOnline(false);
         });
@@ -234,12 +245,15 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
               if (online !== null) setIsOnline(online);
               updateOccupied(payload);
             } else if (topic.endsWith("/sensores/temperatura")) {
+              setIsOnline(true);
               const value = asNumber(payload.valor ?? payload.temperatura);
               if (value !== null) appendHistory("temperature", value, at);
             } else if (topic.endsWith("/sensores/humedad")) {
+              setIsOnline(true);
               const value = asNumber(payload.valor ?? payload.humedad);
               if (value !== null) appendHistory("humidity", value, at);
             } else if (topic.endsWith("/actuadores/estado")) {
+              setIsOnline(true);
               const angle = asNumber(payload.rotacion_grados ?? payload.servo_ang);
               if (angle !== null) setServoAngle(angle);
               if ("foco" in payload) setHeaterOn(actuatorIsOn(payload.foco));
@@ -298,7 +312,8 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
             // Se ignoran mensajes que no correspondan al JSON de los tópicos de la aplicación.
           }
         });
-      } catch {
+      } catch (err) {
+        console.error("[useTelemetry] Connection failed:", err);
         if (!disposed) {
           setIsMqttConnected(false);
           setIsOnline(false);

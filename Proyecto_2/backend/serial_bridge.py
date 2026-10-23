@@ -113,9 +113,26 @@ def main():
     try:
         with serial.Serial(puerto, 9600, timeout=2) as ser_conn:
             ser = ser_conn
+            client.will_set(
+                f"smartegg/{NODE_ID}/status",
+                json.dumps({"nodo_id": NODE_ID, "estado": "offline", "valor": 0}),
+                qos=1,
+                retain=True,
+            )
             client.connect(mqtt_host, mqtt_port, 60)
             client.subscribe(f"smartegg/{NODE_ID}/control/#", qos=1)
             client.loop_start()
+            client.publish(
+                f"smartegg/{NODE_ID}/status",
+                json.dumps({
+                    "nodo_id": NODE_ID,
+                    "estado": "online",
+                    "valor": 1,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }),
+                qos=1,
+                retain=True,
+            )
             print(f"Conectado exitosamente al broker Mosquitto en {mqtt_host}:{mqtt_port}.")
             print(f"Escuchando puerto {puerto}... Enviando datos a Docker.\n")
             while True:
