@@ -14,7 +14,7 @@ import type { MqttClient } from "mqtt";
 import { authenticatedTechnician } from "@/lib/mock-data";
 import { ROLE_LABELS } from "@/lib/auth";
 import { useAuth } from "@/components/auth/auth-provider";
-import { API_BASE_URL, MQTT_WS_URL, NODE_ID } from "@/lib/config";
+import { API_BASE_URL, MQTT_WS_URL, NODE_ID, getMqttWsUrl } from "@/lib/config";
 import type { Alarm, DoorEvent, Lot, TelemetryPoint, TelemetryState } from "@/lib/types";
 
 type ControlChannel = "control/bloqueo" | "control/energia";
@@ -186,7 +186,8 @@ export function TelemetryProvider({ children }: { children: ReactNode }) {
       try {
         const mqtt = await import("mqtt");
         if (disposed) return;
-        client = mqtt.connect(MQTT_WS_URL, {
+        const wsUrl = getMqttWsUrl();
+        client = mqtt.connect(wsUrl, {
           clientId: `smartegg-dashboard-${Math.random().toString(16).slice(2)}`,
           clean: true,
           reconnectPeriod: 2_000,
