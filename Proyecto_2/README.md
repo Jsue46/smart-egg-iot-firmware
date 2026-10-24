@@ -18,6 +18,15 @@ La **Fase 3 de SmartEgg** consolida la evolución de una incubadora IoT tradicio
 
 ---
 
+## 🎥 Enlaces de Presentación y Evidencias en Video
+
+* 🎬 **Video Oficial de Presentación y Demostración:**  
+  👉 [Ver Video en Google Drive](https://drive.google.com/file/d/1SPHSYFOQwoNANrxaVcHdWMMm4NSuhYoy/view?usp=sharing)
+* 📁 **Carpeta de Recursos, Grabaciones y Evidencias del Proyecto:**  
+  👉 [Ver Carpeta en Google Drive](https://drive.google.com/drive/folders/17G8cuBPjqcITTmHt0bkIyuxbn2glehkR)
+
+---
+
 ## 🛠️ Arquitectura y Capas del Framework IoT
 
 ```

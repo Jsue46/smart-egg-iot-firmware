@@ -31,7 +31,15 @@ Para superar estas barreras, la **Fase 3** redefine a SmartEgg como un **sistema
 
 ---
 
-### 1.3 Restricción Técnica Crítica: Control Exclusivo por MQTT
+### 1.3 Enlaces de Video de Presentación y Evidencias del Proyecto
+* 🎬 **Video Oficial de Presentación y Demostración:**  
+  👉 [Ver Video en Google Drive](https://drive.google.com/file/d/1SPHSYFOQwoNANrxaVcHdWMMm4NSuhYoy/view?usp=sharing)
+* 📁 **Carpeta de Recursos, Grabaciones y Evidencias:**  
+  👉 [Ver Carpeta en Google Drive](https://drive.google.com/drive/folders/17G8cuBPjqcITTmHt0bkIyuxbn2glehkR)
+
+---
+
+### 1.4 Restricción Técnica Crítica: Control Exclusivo por MQTT
 > [!CAUTION] 
 > Queda **estrictamente prohibido el uso de APIs REST para controlar sensores y actuadores (-100% de penalización en rúbrica)**.  
 > Todo el control bidireccional (apertura/cierre de puerta, encendido/apagado de actuadores, órdenes de bloqueo de seguridad y temporizadores de energía) opera **únicamente a través del Broker MQTT público en la nube**.  

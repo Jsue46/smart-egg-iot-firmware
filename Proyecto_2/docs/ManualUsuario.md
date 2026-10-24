@@ -25,7 +25,16 @@ Dependiendo del entorno de ejecución, los servicios se encuentran expuestos en 
 
 ---
 
-### 1.2 Credenciales de Acceso a Grafana (Rol Evaluador vs Administrador)
+### 1.2 Enlaces de Video de Presentación y Evidencias
+
+* 🎬 **Video Oficial de Presentación y Demostración:**  
+  👉 [Ver Video en Google Drive](https://drive.google.com/file/d/1SPHSYFOQwoNANrxaVcHdWMMm4NSuhYoy/view?usp=sharing)
+* 📁 **Carpeta de Recursos, Grabaciones y Evidencias del Proyecto:**  
+  👉 [Ver Carpeta en Google Drive](https://drive.google.com/drive/folders/17G8cuBPjqcITTmHt0bkIyuxbn2glehkR)
+
+---
+
+### 1.3 Credenciales de Acceso a Grafana (Rol Evaluador vs Administrador)
 
 Para preservar la integridad de los tableros durante las jornadas de calificación y evaluación presencial, se disponen dos perfiles de acceso:
 
