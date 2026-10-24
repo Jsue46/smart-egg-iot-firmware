@@ -122,7 +122,7 @@ def cargar_dataset():
     return np.array(X), np.array(y), detalles
 
 
-def main():
+def entrenar_modelo_fn():
     print("=" * 65)
     print("  SmartEgg Vision - Entrenamiento y Evaluacion de Modelo")
     print("=" * 65)
@@ -135,7 +135,7 @@ def main():
     if len(X) < 15:
         print("ERROR: No hay suficientes muestras para entrenar.")
         print("Ejecuta primero 'python vision/generar_dataset_inicial.py' o toma fotos con 'capturar_dataset.py'.")
-        return
+        return None, 0.0
 
     # Split estratificado para entrenamiento y evaluacion
     X_train, X_test, y_train, y_test = train_test_split(
@@ -153,7 +153,8 @@ def main():
 
     # Validacion cruzada (5-fold)
     cv_scores = cross_val_score(clf, X, y, cv=5)
-    print(f"\nExactitud promedio (Validacion Cruzada 5-Fold): {cv_scores.mean() * 100:.2f}% (+/- {cv_scores.std()*100:.2f}%)")
+    acc = float(cv_scores.mean())
+    print(f"\nExactitud promedio (Validacion Cruzada 5-Fold): {acc * 100:.2f}% (+/- {cv_scores.std()*100:.2f}%)")
 
     # Evaluacion en conjunto de prueba
     y_pred = clf.predict(X_test)
@@ -167,7 +168,7 @@ def main():
         "model": clf,
         "classes": CLASSES,
         "train_samples": len(X),
-        "cv_accuracy_mean": float(cv_scores.mean()),
+        "cv_accuracy_mean": acc,
         "created_at": datetime.now().isoformat()
     }
     joblib.dump(datos_empaquetados, MODEL_PATH)
@@ -179,7 +180,7 @@ def main():
         cm = confusion_matrix(y_test, y_pred)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=CLASSES)
         disp.plot(cmap="Blues", ax=ax, values_format="d")
-        plt.title(f"Matriz de Confusion - SmartEgg Vision (Exactitud: {cv_scores.mean()*100:.1f}%)")
+        plt.title(f"Matriz de Confusion - SmartEgg Vision (Exactitud: {acc*100:.1f}%)")
         plt.tight_layout()
         plt.savefig(METRICS_IMG_PATH, dpi=150)
         plt.close()
@@ -188,6 +189,11 @@ def main():
         print(f"No se pudo generar la grafica: {e}")
 
     print("\nProceso de entrenamiento completado al 100%.")
+    return clf, acc
+
+
+def main():
+    entrenar_modelo_fn()
 
 
 if __name__ == "__main__":

@@ -21,3 +21,7 @@ dist/
 
 # Dataset sintético del módulo ML (se regenera con ml/generar_dataset.py)
 ml/data/lecturas_sinteticas.csv
+
+# Archivos temporales de vision
+vision/scratch/
+

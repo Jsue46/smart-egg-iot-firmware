@@ -68,6 +68,18 @@ class DetectorVisionSmartEgg:
         self.intervalo_telemetria = 1.0  # Cada 1 segundo
         self.fps = 0.0
 
+        # Configuracion de ROI interactivo y calibracion de camara
+        self.roi_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "roi_config.json")
+        self.roi_offset_x = 0
+        self.roi_offset_y = 35  # Desplazado ligeramente hacia abajo para enfocar la bandeja y evitar el foco
+        self.roi_scale = 0.50
+        self._cargar_roi_config()
+
+        # Mensajes de notificacion en pantalla (HUD)
+        self.mensaje_hud = ""
+        self.mensaje_hud_tiempo = 0
+        self.mensaje_hud_color = (0, 255, 0)
+
         # Conectar MQTT
         self.client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
@@ -76,6 +88,68 @@ class DetectorVisionSmartEgg:
         self.client.on_connect = self._on_mqtt_connect
         self.client.on_message = self._on_mqtt_message
         self._conectar_mqtt()
+
+    def _cargar_roi_config(self):
+        try:
+            if os.path.exists(self.roi_config_path):
+                with open(self.roi_config_path, "r") as f:
+                    data = json.load(f)
+                    self.roi_offset_x = data.get("offset_x", self.roi_offset_x)
+                    self.roi_offset_y = data.get("offset_y", self.roi_offset_y)
+                    self.roi_scale = data.get("scale", self.roi_scale)
+        except Exception as e:
+            print(f"Aviso leyendo roi_config: {e}")
+
+    def _guardar_roi_config(self):
+        try:
+            with open(self.roi_config_path, "w") as f:
+                json.dump({
+                    "offset_x": self.roi_offset_x,
+                    "offset_y": self.roi_offset_y,
+                    "scale": round(self.roi_scale, 2)
+                }, f, indent=2)
+        except Exception as e:
+            print(f"Aviso guardando roi_config: {e}")
+
+    def mostrar_mensaje(self, texto: str, color=(0, 255, 0), duracion=2.5):
+        self.mensaje_hud = texto
+        self.mensaje_hud_tiempo = time.time() + duracion
+        self.mensaje_hud_color = color
+        print(f"[HUD] {texto}")
+
+    def capturar_muestras(self, roi, clase_nombre: str):
+        """Guarda muestras reales en vivo de la camara con variacion de datos."""
+        dir_cls = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dataset", clase_nombre)
+        os.makedirs(dir_cls, exist_ok=True)
+        ts = int(time.time() * 1000)
+
+        # 1. Foto original
+        cv2.imwrite(os.path.join(dir_cls, f"real_{clase_nombre}_{ts}_orig.jpg"), roi)
+
+        # 2. Variaciones (brillo suave y espejado) para aumentar datos rapidamente
+        for i in range(11):
+            aug = roi.copy()
+            brillo = np.random.randint(-20, 21)
+            aug = np.clip(aug.astype(np.int16) + brillo, 0, 255).astype(np.uint8)
+            if i % 2 == 0:
+                aug = cv2.flip(aug, 1)
+            cv2.imwrite(os.path.join(dir_cls, f"real_{clase_nombre}_{ts}_aug{i}.jpg"), aug)
+
+        self.mostrar_mensaje(f"+12 FOTOS GUARDADAS EN [{clase_nombre.upper()}]! Pulsa [T] para reentrenar", (0, 255, 255), 3.0)
+
+    def reentrenar_en_vivo(self):
+        """Reentrena el modelo scikit-learn en caliente sin reiniciar la aplicacion."""
+        self.mostrar_mensaje("REENTRENANDO MODELO... POR FAVOR ESPERA", (0, 255, 255), 4.0)
+        try:
+            from entrenar_modelo import entrenar_modelo_fn
+            clf, acc = entrenar_modelo_fn()
+            if clf is not None:
+                self.model = clf
+                self.mostrar_mensaje(f"MODELO ACTUALIZADO! Exactitud: {acc * 100:.1f}%", (0, 255, 0), 4.0)
+            else:
+                self.mostrar_mensaje("ERROR: Muestras insuficientes en dataset", (0, 0, 255), 3.0)
+        except Exception as e:
+            self.mostrar_mensaje(f"ERROR: {e}", (0, 0, 255), 3.0)
 
     def _conectar_mqtt(self):
         try:
@@ -217,11 +291,18 @@ class DetectorVisionSmartEgg:
         print("\n" + "=" * 65)
         print("  SmartEgg Vision - Monitoreo y Bloqueo Inteligente Activo")
         print("=" * 65)
-        print("Controles interactivos de prueba:")
-        print("  [ESPACIO] -> Alternar Ciclo de Incubacion (ON / OFF)")
-        print("  [B]       -> Forzar prueba de Bloqueo")
-        print("  [R]       -> Resetear / Desbloquear Sistema")
-        print("  [Q]       -> Salir")
+        print("Calibracion de Enfoque y Aprendizaje:")
+        print("  [W] [A] [S] [D] -> Mover caja de enfoque (centrar huevo / alejar foco)")
+        print("  [E] / [C]       -> Agrandar [E] / Encoger [C] caja de enfoque")
+        print("  [H]             -> Guardar 12 fotos reales como HUEVO")
+        print("  [V]             -> Guardar 12 fotos reales como VACIO (quitar huevo)")
+        print("  [O]             -> Guardar 12 fotos reales como OBJETO EXTRAÑO")
+        print("  [T]             -> REENTRENAR modelo scikit-learn al instante")
+        print("Controles de Operacion:")
+        print("  [ESPACIO]       -> Alternar Ciclo de Incubacion (ON / OFF)")
+        print("  [B]             -> Forzar prueba de Bloqueo")
+        print("  [R]             -> Resetear / Desbloquear Sistema")
+        print("  [Q]             -> Salir")
         print("=" * 65 + "\n")
 
         prev_time = time.time()
@@ -238,11 +319,15 @@ class DetectorVisionSmartEgg:
                 prev_time = curr_time
 
                 h, w, _ = frame.shape
-                # Region de interes central (ROI donde reposa el huevo)
-                box_w, box_h = int(w * 0.55), int(h * 0.55)
-                x1 = (w - box_w) // 2
-                y1 = (h - box_h) // 2
-                x2, y2 = x1 + box_w, y1 + box_h
+                # Region de interes (ROI) dinamica y ajustable con WASD / E/C
+                box_w = max(40, min(w - 20, int(w * self.roi_scale)))
+                box_h = max(40, min(h - 20, int(h * self.roi_scale)))
+                cx = (w // 2) + self.roi_offset_x
+                cy = (h // 2) + self.roi_offset_y
+                x1 = max(0, min(w - box_w, cx - box_w // 2))
+                y1 = max(0, min(h - box_h, cy - box_h // 2))
+                x2 = x1 + box_w
+                y2 = y1 + box_h
                 roi = frame[y1:y2, x1:x2]
 
                 # Prediccion con OpenCV + Modelo ML
@@ -288,6 +373,34 @@ class DetectorVisionSmartEgg:
                         self.activar_bloqueo("Prueba manual de bloqueo forzado")
                     elif key == ord("r") or key == ord("R"):
                         self.desbloquear_sistema()
+                    else:
+                        char_key = chr(key).lower() if key < 256 else ""
+                        if char_key == "w":
+                            self.roi_offset_y -= 15
+                            self._guardar_roi_config()
+                        elif char_key == "s":
+                            self.roi_offset_y += 15
+                            self._guardar_roi_config()
+                        elif char_key == "a":
+                            self.roi_offset_x -= 15
+                            self._guardar_roi_config()
+                        elif char_key == "d":
+                            self.roi_offset_x += 15
+                            self._guardar_roi_config()
+                        elif char_key in ["e", "+", "="]:
+                            self.roi_scale = min(0.85, self.roi_scale + 0.04)
+                            self._guardar_roi_config()
+                        elif char_key in ["c", "-", "_"]:
+                            self.roi_scale = max(0.20, self.roi_scale - 0.04)
+                            self._guardar_roi_config()
+                        elif char_key == "h":
+                            self.capturar_muestras(roi, "huevo")
+                        elif char_key == "v":
+                            self.capturar_muestras(roi, "vacio")
+                        elif char_key == "o":
+                            self.capturar_muestras(roi, "objeto_extrano")
+                        elif char_key == "t":
+                            self.reentrenar_en_vivo()
 
         finally:
             cap.release()
@@ -315,7 +428,7 @@ class DetectorVisionSmartEgg:
             color_roi = (200, 200, 200)  # Gris/Blanco
             color_txt = (200, 200, 200)
 
-        # Marco ROI central
+        # Marco ROI central ajustable
         cv2.rectangle(img, (x1, y1), (x2, y2), color_roi, 3 if self.sistema_bloqueado else 2)
 
         # Panel superior de Estado
@@ -352,7 +465,7 @@ class DetectorVisionSmartEgg:
         cv2.putText(
             img,
             texto_deteccion,
-            (x1, y1 - 10),
+            (x1, max(20, y1 - 10)),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.7,
             color_txt,
@@ -365,15 +478,42 @@ class DetectorVisionSmartEgg:
         cv2.rectangle(img, (x1, y2 + 8), (x1 + bar_w, y2 + 16), color_roi, -1)
         cv2.rectangle(img, (x1, y2 + 8), (x2, y2 + 16), (100, 100, 100), 1)
 
+        # Barra inferior de atajos / ayuda rapida
+        cv2.rectangle(img, (0, h - 35), (w, h), (15, 15, 15), -1)
+        cv2.putText(
+            img,
+            "[WASD] Mover | [E/C] Tamano | [H] Foto Huevo | [V] Vacio | [O] Objeto | [T] Reentrenar",
+            (10, h - 12),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.42,
+            (180, 220, 255),
+            1,
+            cv2.LINE_AA,
+        )
+
+        # Notificacion de mensaje temporal si aplica
+        if time.time() < self.mensaje_hud_tiempo:
+            cv2.rectangle(img, (0, 75), (w, 110), (0, 0, 0), -1)
+            cv2.putText(
+                img,
+                self.mensaje_hud,
+                (20, 98),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                self.mensaje_hud_color,
+                2,
+                cv2.LINE_AA,
+            )
+
         # Banner de BLOQUEO si el sistema esta bloqueado
         if self.sistema_bloqueado:
-            cv2.rectangle(img, (0, h - 80), (w, h), (0, 0, 180), -1)
+            cv2.rectangle(img, (0, h - 90), (w, h - 35), (0, 0, 180), -1)
             cv2.putText(
                 img,
                 "¡SISTEMA BLOQUEADO! ALARMA ACTIVADA",
-                (30, h - 45),
+                (30, h - 65),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
+                0.75,
                 (255, 255, 255),
                 2,
                 cv2.LINE_AA,
@@ -381,9 +521,9 @@ class DetectorVisionSmartEgg:
             cv2.putText(
                 img,
                 f"Motivo: {self.ultimo_motivo_bloqueo} | Pulsa [R] para Desbloquear",
-                (30, h - 18),
+                (30, h - 45),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.55,
+                0.5,
                 (200, 255, 255),
                 1,
                 cv2.LINE_AA,
